@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maze Game</title>
+<style>
+  :root {
+    --bg: #14161c;
+    --wall: #3a3f52;
+    --path: #1e2130;
+    --player: #f2c94c;
+    --goal: #56d364;
+    --text: #e6e6f0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin: 0;
+    letter-spacing: 0.02em;
+  }
+  #hud {
+    display: flex;
+    gap: 20px;
+    font-size: 0.95rem;
+    color: #a7abc0;
+  }
+  #hud span { color: var(--text); font-weight: 600; }
+  canvas {
+    background: var(--path);
+    border-radius: 8px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    touch-action: none;
+  }
+  #controls {
+    display: grid;
+    grid-template-columns: repeat(3, 48px);
+    grid-template-rows: repeat(2, 48px);
+    gap: 6px;
+    margin-top: 4px;
+  }
+  #controls button {
+    background: var(--wall);
+    color: var(--text);
+    border: none;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    cursor: pointer;
+  }
+  #controls button:active { background: var(--player); color: #14161c; }
+  #up { grid-column: 2; grid-row: 1; }
+  #left { grid-column: 1; grid-row: 2; }
+  #down { grid-column: 2; grid-row: 2; }
+  #right { grid-column: 3; grid-row: 2; }
+  #newGame {
+    background: var(--player);
+    color: #14161c;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  #win {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.6);
+  }
+  #win.show { display: flex; }
+  #winBox {
+    background: var(--bg);
+    border: 2px solid var(--goal);
+    border-radius: 12px;
+    padding: 24px 32px;
+    text-align: center;
+  }
+  #winBox h2 { color: var(--goal); margin: 0 0 8px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>Maze</h1>
+  <div id="hud">
+    <div>Level <span id="level">1</span></div>
+    <div>Moves <span id="moves">0</span></div>
+    <div>Time <span id="time">0s</span></div>
+  </div>
+  <canvas id="canvas"></canvas>
+  <div id="controls">
+    <button id="up">&uarr;</button>
+    <button id="left">&larr;</button>
+    <button id="down">&darr;</button>
+    <button id="right">&rarr;</button>
+  </div>
+  <button id="newGame">New Maze</button>
+</div>
+
+<div id="win">
+  <div id="winBox">
+    <h2>You made it!</h2>
+    <p id="winStats"></p>
+    <button id="nextLevel">Next Maze</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const levelEl = document.getElementById('level');
+  const movesEl = document.getElementById('moves');
+  const timeEl = document.getElementById('time');
+  const winEl = document.getElementById('win');
+  const winStatsEl = document.getElementById('winStats');
+
+  const CELL = 28;
+  let level = 1;
+  let cols, rows;
+  let grid, player, goal, moves, startTime, timerId, finished;
+
+  function sizeForLevel(l) {
+    const n = Math.min(8 + l * 2, 30);
+    return { cols: n, rows: n };
+  }
+
+  // Cell: {x, y, walls: {N,S,E,W}, visited}
+  function makeGrid(c, r) {
+    const g = [];
+    for (let y = 0; y < r; y++) {
+      const row = [];
+      for (let x = 0; x < c; x++) {
+        row.push({ x, y, walls: { N: true, S: true, E: true, W: true }, visited: false });
+      }
+      g.push(row);
+    }
+    return g;
+  }
+
+  function neighbors(g, cell) {
+    const { x, y } = cell;
+    const list = [];
+    if (y > 0) list.push(['N', g[y - 1][x]]);
+    if (y < g.length - 1) list.push(['S', g[y + 1][x]]);
+    if (x > 0) list.push(['W', g[y][x - 1]]);
+    if (x < g[0].length - 1) list.push(['E', g[y][x + 1]]);
+    return list;
+  }
+
+  const OPP = { N: 'S', S: 'N', E: 'W', W: 'E' };
+
+  function generateMaze(c, r) {
+    const g = makeGrid(c, r);
+    const stack = [g[0][0]];
+    g[0][0].visited = true;
+    while (stack.length) {
+      const current = stack[stack.length - 1];
+      const unvisited = neighbors(g, current).filter(([, n]) => !n.visited);
+      if (unvisited.length === 0) {
+        stack.pop();
+        continue;
+      }
+      const [dir, next] = unvisited[Math.floor(Math.random() * unvisited.length)];
+      current.walls[dir] = false;
+      next.walls[OPP[dir]] = false;
+      next.visited = true;
+      stack.push(next);
+    }
+    return g;
+  }
+
+  function draw() {
+    canvas.width = cols * CELL;
+    canvas.height = rows * CELL;
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--path');
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--wall');
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const cell = grid[y][x];
+        const px = x * CELL, py = y * CELL;
+        ctx.beginPath();
+        if (cell.walls.N) { ctx.moveTo(px, py); ctx.lineTo(px + CELL, py); }
+        if (cell.walls.S) { ctx.moveTo(px, py + CELL); ctx.lineTo(px + CELL, py + CELL); }
+        if (cell.walls.W) { ctx.moveTo(px, py); ctx.lineTo(px, py + CELL); }
+        if (cell.walls.E) { ctx.moveTo(px + CELL, py); ctx.lineTo(px + CELL, py + CELL); }
+        ctx.stroke();
+      }
+    }
+
+    // goal
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--goal');
+    ctx.beginPath();
+    ctx.arc(goal.x * CELL + CELL / 2, goal.y * CELL + CELL / 2, CELL * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // player
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--player');
+    ctx.beginPath();
+    ctx.arc(player.x * CELL + CELL / 2, player.y * CELL + CELL / 2, CELL * 0.32, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function tryMove(dir) {
+    if (finished) return;
+    const cell = grid[player.y][player.x];
+    if (cell.walls[dir]) return;
+    if (dir === 'N') player.y -= 1;
+    if (dir === 'S') player.y += 1;
+    if (dir === 'E') player.x += 1;
+    if (dir === 'W') player.x -= 1;
+    moves += 1;
+    movesEl.textContent = moves;
+    draw();
+    if (player.x === goal.x && player.y === goal.y) win();
+  }
+
+  function win() {
+    finished = true;
+    clearInterval(timerId);
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    winStatsEl.textContent = `Moves: ${moves} · Time: ${elapsed}s`;
+    winEl.classList.add('show');
+  }
+
+  function startTimer() {
+    startTime = Date.now();
+    clearInterval(timerId);
+    timerId = setInterval(() => {
+      timeEl.textContent = Math.floor((Date.now() - startTime) / 1000) + 's';
+    }, 1000);
+  }
+
+  function newGame(sameLevel) {
+    if (!sameLevel) level += 1;
+    levelEl.textContent = level;
+    const s = sizeForLevel(level);
+    cols = s.cols; rows = s.rows;
+    grid = generateMaze(cols, rows);
+    player = { x: 0, y: 0 };
+    goal = { x: cols - 1, y: rows - 1 };
+    moves = 0;
+    finished = false;
+    movesEl.textContent = 0;
+    timeEl.textContent = '0s';
+    winEl.classList.remove('show');
+    startTimer();
+    draw();
+  }
+
+  function restartLevel() {
+    const s = sizeForLevel(level);
+    cols = s.cols; rows = s.rows;
+    grid = generateMaze(cols, rows);
+    player = { x: 0, y: 0 };
+    goal = { x: cols - 1, y: rows - 1 };
+    moves = 0;
+    finished = false;
+    movesEl.textContent = 0;
+    timeEl.textContent = '0s';
+    winEl.classList.remove('show');
+    startTimer();
+    draw();
+  }
+
+  document.addEventListener('keydown', (e) => {
+    const map = { ArrowUp: 'N', ArrowDown: 'S', ArrowLeft: 'W', ArrowRight: 'E', w: 'N', s: 'S', a: 'W', d: 'E' };
+    if (map[e.key]) { e.preventDefault(); tryMove(map[e.key]); }
+  });
+
+  document.getElementById('up').addEventListener('click', () => tryMove('N'));
+  document.getElementById('down').addEventListener('click', () => tryMove('S'));
+  document.getElementById('left').addEventListener('click', () => tryMove('W'));
+  document.getElementById('right').addEventListener('click', () => tryMove('E'));
+  document.getElementById('newGame').addEventListener('click', restartLevel);
+  document.getElementById('nextLevel').addEventListener('click', () => newGame(false));
+
+  level = 0;
+  newGame(false);
+})();
+</script>
+</body>
+</html>
