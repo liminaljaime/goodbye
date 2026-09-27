@@ -1,0 +1,1353 @@
+<title>Just One More Goodbye</title>
+<style>
+  :root{
+    --bg:#0d1321;
+    --panel:#171f33;
+    --panel-edge:#2a3559;
+    --wall:#22284a;
+    --wall-dark:#171b33;
+    --floor:#e8c99b;
+    --floor-dark:#d9b686;
+    --ink:#f4ecd8;
+    --ink-dim:#a9a3c9;
+    --accent:#ff5d73;
+    --accent-2:#5ee6c8;
+    --accent-3:#ffd257;
+    --door:#5ee6c8;
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#0d1321; --panel:#171f33; --panel-edge:#2a3559; --ink:#f4ecd8;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    min-height:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:16px 16px 24px;
+    font-family:'Press Start 2P', monospace;
+  }
+  h1{display:none;}
+  .cabinet{
+    width:100%;
+    max-width:720px;
+    background:linear-gradient(180deg,var(--panel),var(--bg));
+    border:4px solid var(--panel-edge);
+    border-radius:14px;
+    padding:14px;
+    box-shadow:0 10px 0 rgba(0,0,0,.35), inset 0 0 0 2px rgba(255,255,255,.03);
+  }
+  .marquee{
+    text-align:center;
+    font-size:11px;
+    letter-spacing:1px;
+    color:var(--accent-3);
+    text-shadow:0 2px 0 rgba(0,0,0,.5);
+    margin-bottom:10px;
+    line-height:1.8;
+  }
+  .marquee .sub{
+    display:block;
+    font-size:7px;
+    color:var(--ink-dim);
+    margin-top:2px;
+  }
+  .screen-wrap{
+    position:relative;
+    width:100%;
+    aspect-ratio:320/240;
+    background:#000;
+    border-radius:6px;
+    overflow:hidden;
+    border:3px solid var(--wall-dark);
+    box-shadow: inset 0 0 24px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.04);
+  }
+  canvas{
+    position:absolute;
+    top:0; left:0;
+    width:100%;
+    height:100%;
+    image-rendering:pixelated;
+    image-rendering:crisp-edges;
+    display:block;
+  }
+  .controls-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:12px;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .hint{
+    font-size:7px;
+    color:var(--ink-dim);
+    line-height:1.9;
+  }
+  .btn{
+    font-family:'Press Start 2P', monospace;
+    font-size:8px;
+    background:var(--panel-edge);
+    color:var(--ink);
+    border:2px solid var(--ink-dim);
+    border-radius:4px;
+    padding:8px 10px;
+    cursor:pointer;
+  }
+  .btn:active{ transform:translateY(1px); }
+  .btn:hover{ border-color:var(--accent-2); color:var(--accent-2); }
+  .footer{
+    text-align:center;
+    margin-top:14px;
+    font-size:7px;
+    color:var(--ink-dim);
+    line-height:1.8;
+  }
+  @media (max-width:480px){
+    .marquee{ font-size:9px; }
+    .marquee .sub{ font-size:6px; }
+  }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+
+<div class="cabinet">
+  <div class="marquee">JUST ONE MORE GOODBYE
+    <span class="sub">you can leave whenever you want</span>
+  </div>
+  <div class="screen-wrap">
+    <canvas id="game" width="320" height="240"></canvas>
+  </div>
+  <div class="controls-row">
+    <div class="hint">ARROWS / WASD MOVE<br>WALK INTO A GUEST TO TALK<br>SPACE ADVANCES &middot; 1/2 PICKS A REPLY</div>
+    <button class="btn" id="soundBtn" type="button">SOUND: OFF</button>
+  </div>
+  <div class="footer">A PARTY YOU CANNOT LEAVE &middot; EST. TONIGHT</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var canvas = document.getElementById('game');
+  var ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  var TILE = 20, COLS = 16, ROWS = 11, STATUS_H = 20;
+
+  // ---------- map ----------
+  // # wall, . floor, D door(opening in wall). Furniture and the dance floor are layered on separately.
+  var MAP = [
+    "################",
+    "#..............#",
+    "#..............#",
+    "#..............#",
+    "#..............D",
+    "#..............#",
+    "#..............#",
+    "#..............#",
+    "#..............#",
+    "#..............#",
+    "################"
+  ];
+
+  var FURNITURE = [
+    {gx:3, gy:1, type:'T'}, {gx:12, gy:1, type:'C'},
+    {gx:5, gy:2, type:'T'}, {gx:12, gy:2, type:'T'},
+    {gx:3, gy:3, type:'C'}, {gx:11, gy:3, type:'T'},
+    {gx:2, gy:6, type:'T'}, {gx:13, gy:6, type:'C'},
+    {gx:3, gy:9, type:'C'}, {gx:12, gy:9, type:'T'}
+  ];
+  var FURNITURE_MAP = {};
+  FURNITURE.forEach(function(f){ FURNITURE_MAP[f.gx+','+f.gy] = f.type; });
+
+  var DANCE_X0 = 5, DANCE_X1 = 10, DANCE_Y0 = 4, DANCE_Y1 = 9;
+  function isDanceFloor(gx, gy){
+    return gx >= DANCE_X0 && gx <= DANCE_X1 && gy >= DANCE_Y0 && gy <= DANCE_Y1;
+  }
+
+  function solidAt(gx, gy){
+    if (gy < 0 || gy >= ROWS || gx < 0 || gx >= COLS) return true;
+    var c = MAP[gy][gx];
+    if (c === '#') return true;
+    return !!FURNITURE_MAP[gx+','+gy];
+  }
+  function isDoor(gx, gy){ return MAP[gy] && MAP[gy][gx] === 'D'; }
+
+  // ---------- palette per-actor ----------
+  var GUEST_COLORS = [
+    ['#ff5d73','#c93b52'], ['#5ee6c8','#2fae95'], ['#ffd257','#cf9f22'],
+    ['#c58bff','#8a54d1'], ['#ff9e5e','#d5702c'],
+    ['#a4e05a','#6fa930'], ['#ff7ec9','#d3489e'], ['#f4ecd8','#b7ad8f']
+  ];
+  var PLAYER_COLOR = ['#7ec4ff','#3f8fd6'];
+  var NAME_POOL = ["Sarah","Tom","Priya","Mike","Elena","Dave","Wendy",
+    "Nia","Carlos","Farah","Ben","Yuki","Oscar","Lena","Theo","Mia"];
+  var namePtr = 0;
+  function nextName(loop){
+    var n = NAME_POOL[namePtr % NAME_POOL.length];
+    namePtr++;
+    if (namePtr > NAME_POOL.length) n += " (again)";
+    return n;
+  }
+
+  // ---------- character voice database ----------
+  // Each guest has a fixed mechanical shape (how the conversation plays out)
+  // and a fully bespoke voice across five escalating loop states:
+  //   fresh  -- loop 1, a completely normal goodbye
+  //   tier1  -- loop 2, something feels slightly familiar
+  //   tier2  -- loop 3, they start noticing the pattern
+  //   tier3  -- loop 4, they're aware something's wrong, in their own voice
+  //   tier4  -- loop 5+, fully adapted to the loop, still in character
+  // A brand-new arrival guest is always played at "fresh" (they don't know
+  // what's going on yet) via effectiveTier(); everyone else uses tier().
+  var CHARACTERS = {
+    Elena: {
+      mechanic: "chill", gender: "f",
+      hintAsk: "Catch {next} on your way out.",
+      lines: {
+        fresh: { theirs: "Yeah, sound. Night, mate.", hintGuestReact: "Yeah. Night." },
+        tier1: { theirs: "Round two. Sound. Night.", hintGuestReact: "Yeah. Weird, but sure." },
+        tier2: { theirs: "Third one now, is it. Sound.", hintGuestReact: "Yeah. It's weird. I know." },
+        tier3: { theirs: "Sound. This keeps happening.", hintGuestReact: "Yeah. It's weird. Not fussed though." },
+        tier4: { theirs: "Sound. Same as ever.", hintGuestReact: "Yeah. It's weird. We're all just doing it now." }
+      }
+    },
+    Yuki: {
+      mechanic: "chill", gender: "f",
+      hintAsk: "Oh -- um, and {next} too, if you get the chance.",
+      lines: {
+        fresh: { theirs: "Oh -- okay! Bye. This was really nice.", hintGuestReact: "Oh -- okay. Sorry, um, yes." },
+        tier1: { theirs: "Oh. Um. Bye again, then?", hintGuestReact: "Sorry -- was that a yes? I mean -- okay." },
+        tier2: { theirs: "Sorry -- is this the third time? I don't want to be rude and ask.", hintGuestReact: "Um. Sorry. I don't know if I should say something." },
+        tier3: { theirs: "Oh gosh. Um. Bye again. Sorry, I don't know what to say.", hintGuestReact: "Sorry -- I really don't know if you're annoyed at me or not." },
+        tier4: { theirs: "Oh. Bye. I've stopped trying to work out if this is new.", hintGuestReact: "Sorry. Um. I'll just say it every time, just in case." }
+      }
+    },
+    Mia: {
+      mechanic: "chill", gender: "f",
+      hintAsk: "Oh -- and {next}, apparently.",
+      lines: {
+        fresh: { theirs: "Oh my god, same. Teach me your ways.", hintGuestReact: "Oh -- fair enough. Good luck." },
+        tier1: { theirs: "You're really trying again? Respect.", hintGuestReact: "I believe you. Genuinely. Go." },
+        tier2: { theirs: "Third attempt? Same. I actually believe every word of this.", hintGuestReact: "I know. I know you have. I believe you completely." },
+        tier3: { theirs: "Four times. I've started keeping notes. On your side, for the record.", hintGuestReact: "I believe you. I've believed you since the second one." },
+        tier4: { theirs: "Honestly? At this point you're basically my proof.", hintGuestReact: "I know. I've always known. Go, before it gets you again." }
+      }
+    },
+    Tom: {
+      mechanic: "oblivious", gender: "m",
+      hintAsk: "Oh, and catch {next} before you go, mate.",
+      lines: {
+        fresh: { q: "Wait, you're heading off? Already?", confuse2: "Nah, you're alright, go on then, legend.", whatBeat: "Eh?", close: "Ah, fair enough. So good seeing you, mate.", hintGuestReact: "Nice one. Go on." },
+        tier1: { q: "Hang on -- didn't we just do this?", confuse2: "Nah, must be someone else. Go on.", whatBeat: "Mate?", close: "Weird. Anyway -- love you, legend.", hintGuestReact: "Ha, yeah, whatever you say, mate." },
+        tier2: { q: "Mate. Mate, we've done this. I remember your face.", confuse2: "Nah, come off it, you're having a laugh.", whatBeat: "What?", close: "Forget it, doesn't matter -- love you, legend.", hintGuestReact: "Mate, you're winding me up." },
+        tier3: { q: "Tom. We are doing this again. I can feel it happening.", confuse2: "Nah, mate. Nah. You're definitely winding me up.", whatBeat: "MATE.", close: "Don't even care anymore -- love you, legend.", hintGuestReact: "Mate. You're actually winding me up now." },
+        tier4: { q: "Same as always, isn't it.", confuse2: "Yeah, yeah, classic us. Go on.", whatBeat: "Yeah?", close: "Love you, legend. See you in five.", hintGuestReact: "Mate, I've stopped believing you're being serious." }
+      }
+    },
+    Priya: {
+      mechanic: "oblivious", gender: "f",
+      hintAsk: "Oh! And {next} too -- say bye, yeah?",
+      lines: {
+        fresh: { q: "Oh my god, wait -- sorry, who are you again?", confuse2: "Oh my god, YES, of course, sorry!", whatBeat: "Sorry?", close: "Bye! This was so nice, whoever you are.", hintGuestReact: "Yes! Sorry, yes, go!" },
+        tier1: { q: "Wait -- sorry -- have we done this? You look familiar.", confuse2: "Oh no, have I forgotten already? I'm so sorry.", whatBeat: "Sorry, what?", close: "I'm so sorry, my brain is mush. Bye though!", hintGuestReact: "Oh god, sorry, yes, of course." },
+        tier2: { q: "Wait, I definitely know your face. Have we said bye already?", confuse2: "Oh my god, have I forgotten AGAIN? I'm the worst.", whatBeat: "Sorry, sorry, what?", close: "That is so weird. Bye! I'll remember your name eventually!", hintGuestReact: "Sorry, sorry -- yes, I promise, go." },
+        tier3: { q: "Okay, we've definitely done this. I don't know your name and that's on me.", confuse2: "I'm so sorry, I clearly keep forgetting, it's not you, it's me.", whatBeat: "Sorry -- what was that?", close: "This is the weirdest deja vu. Bye! I'm sorry, whoever you are!", hintGuestReact: "I'm sorry. I don't know why I keep doing this to you." },
+        tier4: { q: "I'm not even going to ask if we've met. Obviously we have.", confuse2: "Story of my night, honestly. Sorry.", whatBeat: "Sorry -- yes?", close: "Bye! Love you! I've made peace with not knowing your name.", hintGuestReact: "Sorry. Genuinely. I'll get it right eventually. Maybe." }
+      }
+    },
+    Nia: {
+      mechanic: "oblivious", gender: "f",
+      hintAsk: "Oh -- and {next}'s around somewhere, say bye.",
+      lines: {
+        fresh: { q: "Wait, wait, you HAVE to hear this transition.", confuse2: "Fine, fine -- go, text me when the next one drops.", whatBeat: "Huh?", close: "This set's insane, honestly. Bye.", hintGuestReact: "Yeah, sure, go on." },
+        tier1: { q: "Did I already play you this one? Doesn't matter, listen.", confuse2: "Yeah, still leaving, I heard you.", whatBeat: "Sorry, what?", close: "Mad. Okay bye, one more song though, actually --", hintGuestReact: "Yeah, whatever, sure." },
+        tier2: { q: "Wait, I've definitely played you this exact transition before.", confuse2: "You probably have said that, yeah. I wasn't really listening.", whatBeat: "Sorry -- what?", close: "Weird. Okay. Bye. Actually -- one more, hang on --", hintGuestReact: "I think it's the playlist, honestly." },
+        tier3: { q: "Okay this is definitely the same transition. Every time.", confuse2: "Yeah, I know, I know, I heard you the first four times.", whatBeat: "WHAT?", close: "Fine. Bye. The set's basically a loop too, now I think about it.", hintGuestReact: "It's the playlist. It has to be the playlist." },
+        tier4: { q: "I've stopped trying to remember what I've played you.", confuse2: "Story of my night. Just listen.", whatBeat: "What -- sorry?", close: "Bye! Actually, one more -- no. Bye. For real.", hintGuestReact: "Genuinely think it's the playlist at this point." }
+      }
+    },
+    Oscar: {
+      mechanic: "oblivious", gender: "m",
+      hintAsk: "Also {next}. Say bye to {next}.",
+      lines: {
+        fresh: { q: "WAIT. Are you leaving?", confuse2: "Yeah, mate, go on then.", whatBeat: "What?", close: "NO. Okay. Fine. Text me. Wait, do I have your number?", hintGuestReact: "Yeah! Go on! Wait, what were we -- go on." },
+        tier1: { q: "Wait -- have we done the leaving bit already?", confuse2: "Yeah, mate, same as before.", whatBeat: "Eh? What?", close: "Mental. Okay. Bye! Wait, are you the pizza guy?", hintGuestReact: "Yeah, sure -- who again? Doesn't matter, go." },
+        tier2: { q: "THIRD TIME. Wait, how do I know that? Something's off, mate.", confuse2: "Something's very off, mate, and I've lost my drink.", whatBeat: "Sorry, what were you -- what?", close: "Mad. Genuinely mad. Bye! Who ordered the pizza?", hintGuestReact: "Yeah, go -- hang on, who's leaving? You. Go." },
+        tier3: { q: "I keep having this exact conversation, mate. Is that normal?", confuse2: "Might be, mate, I dunno, I've forgotten half of what I said already.", whatBeat: "What -- sorry, what were we saying?", close: "That's mental. Okay bye! Wait -- did the pizza come?", hintGuestReact: "Go -- wait, who's -- yeah. Go. Definitely go." },
+        tier4: { q: "You know what, I'm not gonna ask, this just happens now.", confuse2: "Yeah. This is just tonight, apparently.", whatBeat: "Sorry -- what were we even doing?", close: "Mental. Love it though. Bye! Is the pizza guy stuck in this too?", hintGuestReact: "Yeah, go -- go where though? Go, mate. Just go." }
+      }
+    },
+    Mike: {
+      mechanic: "chatty", gender: "m",
+      hintAsk: "Oh, catch {next} before you go, yeah?",
+      lines: {
+        fresh: { hook: "Yeah, yeah, go. Anyway, the thing with the van--", keepGoing: "Yeah, that's what I mean. Because the van--", whatBeat: "What?", circular: "Yeah. I'm telling you to leave.", cutSelf: "So anyway-- actually, no, go on, go. Love you, mate.", hintGuestReact: "Yeah, yeah. Go on then." },
+        tier1: { hook: "Yeah, go on -- wait, did I tell you the end of the van thing?", keepGoing: "No? Okay so basically--", whatBeat: "Hm? What?", circular: "Yeah, that's -- yeah. Go. I'm agreeing with you.", cutSelf: "Anyway-- no, you're right, go. Drive safe. Walk safe.", hintGuestReact: "Yeah, yeah. Sure. Anyway--" },
+        tier2: { hook: "Go on, mate -- have I told you this one tonight already?", keepGoing: "Doesn't matter, this bit's different, listen--", whatBeat: "What, mate?", circular: "Yeah, exactly, that's what I've been saying. Go.", cutSelf: "So anyway-- no. No, go. I mean it. Love you, mate.", hintGuestReact: "Yeah, yeah. Anyway--" },
+        tier3: { hook: "Go on -- has this story been getting longer each time, or is that me?", keepGoing: "Anyway, doesn't matter, which is mad because it wasn't even that long first time--", whatBeat: "WHAT, mate?", circular: "Yeah! That's what I'm saying! Go!", cutSelf: "So anyway-- go. Genuinely. I have to physically stop talking now.", hintGuestReact: "Yeah, yeah. Anyway--" },
+        tier4: { hook: "Go on -- don't even start me, I know how it ends anyway. Go on, go on.", keepGoing: "Actually, at this point the story might just BE the party, mate.", whatBeat: "Mm? What?", circular: "Yeah. Leaving. I know. Go.", cutSelf: "So anyway-- I'm leaving mid-story here too, honestly. Love you.", hintGuestReact: "Yeah, yeah. Anyway--" }
+      }
+    },
+    Carlos: {
+      mechanic: "chatty", gender: "m",
+      hintAsk: "And {next} -- say bye to {pron_obj} too.",
+      lines: {
+        fresh: { hook: "No but listen, before you go, this is important--", keepGoing: "-- and that's exactly what they don't want you thinking about.", whatBeat: "What.", circular: "Yeah, exactly -- that's the point. You're leaving. Good.", cutSelf: "Anyway-- stay safe out there, yeah? Love you.", hintGuestReact: "Yeah. Go. Think about it." },
+        tier1: { hook: "Wait, go on -- have I told you this theory already? It's evolved.", keepGoing: "-- which, if you think about it, explains tonight too.", whatBeat: "What?", circular: "Right -- exactly. You're proving my point right now.", cutSelf: "Anyway-- think about it. Seriously. Bye.", hintGuestReact: "See, that. That's exactly it." },
+        tier2: { hook: "Wait -- THREE goodbyes. Doesn't that seem odd to you? Listen--", keepGoing: "-- because I've said this party feels off all night, and now THIS.", whatBeat: "What, what?", circular: "Exactly! You feel it too! This is what I've been saying!", cutSelf: "Anyway-- be careful tonight, I mean that. Bye.", hintGuestReact: "THANK YOU. Finally. Someone else sees it." },
+        tier3: { hook: "See, THIS is what I mean. Four goodbyes. That's a structure--", keepGoing: "-- and once you see the structure, mate, you can't unsee it.", whatBeat: "WHAT.", circular: "You're living proof. Right now. This exact moment.", cutSelf: "Anyway-- stay sharp. I mean that more than usual now.", hintGuestReact: "I've been saying this all night. You're the proof." },
+        tier4: { hook: "You get it now, right? You have to get it now--", keepGoing: "-- this isn't a party anymore, mate, this is a system.", whatBeat: "What.", circular: "Exactly. We're both inside it. Right now. Still.", cutSelf: "Anyway-- see you in the next one, probably. Love you.", hintGuestReact: "Told you. I've been telling everyone." }
+      }
+    },
+    Ben: {
+      mechanic: "chatty", gender: "m",
+      hintAsk: "Oh, and catch {next} before you go.",
+      lines: {
+        fresh: { hook: "Wait, no, you cannot leave before my song--", keepGoing: "-- it's literally cued up, I've been waiting all night for this key change.", whatBeat: "What?", circular: "Yeah -- exactly, you're leaving before my song. That's what I said.", cutSelf: "Anyway-- love you, mate, I'm gonna head off now though -- wait, no, that's you.", hintGuestReact: "You're just trying to dodge the key change, aren't you." },
+        tier1: { hook: "You said that last time too, right before my song--", keepGoing: "-- and you missed the key change AGAIN, mate, it's tragic.", whatBeat: "Mate, what?", circular: "Yeah, leaving, before my song, again. I know the drill.", cutSelf: "Anyway-- I promise I'll catch the next key change some other loop.", hintGuestReact: "You're timing this to dodge my song, aren't you." },
+        tier2: { hook: "Third time missing my key change. THIRD. Do you know how that feels--", keepGoing: "-- I've been building to this note ALL NIGHT and you keep walking out.", whatBeat: "WHAT, mate?", circular: "Yeah, leaving, before the note, I've heard this bit.", cutSelf: "Anyway-- I am so sorry about the note. I'll catch it next time.", hintGuestReact: "This is definitely about dodging my song, isn't it." },
+        tier3: { hook: "Fourth time. I'm starting to think you're doing this on purpose--", keepGoing: "-- there is NO WAY you keep missing this note by accident, mate.", whatBeat: "WHAT.", circular: "Leaving. Before the note. Every single time. Noted.", cutSelf: "Anyway-- one of these times I will hear the whole song, I promise.", hintGuestReact: "You are absolutely doing this to dodge my key change." },
+        tier4: { hook: "You know what, at this point I don't even think the song ends--", keepGoing: "-- we're just permanently one note away from the big moment, forever.", whatBeat: "What?", circular: "Yeah. Leaving. Before the note. As ever.", cutSelf: "Anyway-- see you at the key change. Again. Eventually.", hintGuestReact: "Story of my night. You and that note." }
+      }
+    },
+    Theo: {
+      mechanic: "chatty", gender: "m",
+      hintAsk: "Oh, and find {next} before you go.",
+      lines: {
+        fresh: { hook: "Wait, have you tried this? Just -- just wait, one second--", keepGoing: "-- okay it's not quite ready but you have to taste the sauce at least.", whatBeat: "What?", circular: "Yeah -- go, but taste this first, that's all I'm saying.", cutSelf: "Anyway-- love you, I'll save you some for next time, I promise.", hintGuestReact: "Take some with you at least." },
+        tier1: { hook: "Did you try it last time? Doesn't matter, taste it again--", keepGoing: "-- I tweaked the garlic, it's better now, I promise.", whatBeat: "Sorry, what?", circular: "Yeah, go, but taste it first, same as before.", cutSelf: "Anyway-- genuinely, I'll save you a plate. I've got to let you go.", hintGuestReact: "Take some for the road, honestly, it's good." },
+        tier2: { hook: "Third goodbye and it's STILL not ready, which tracks -- taste this bit--", keepGoing: "-- because I've added more garlic since the last two times.", whatBeat: "What, sorry?", circular: "Leaving, yeah, taste it first though, every time.", cutSelf: "Anyway-- it's going to be ready right as the party ends, isn't it.", hintGuestReact: "You should take a plate. You always leave hungry." },
+        tier3: { hook: "Four times and I genuinely think it's slightly more done each time--", keepGoing: "-- it's ALMOST there. Been almost there for hours. Taste it.", whatBeat: "WHAT?", circular: "Leaving. Taste it first. We both know how this goes.", cutSelf: "Anyway-- I think this bread might outlive the party.", hintGuestReact: "You never take a plate. Take a plate this time." },
+        tier4: { hook: "You know what, at this point I don't think it's ABOUT being ready--", keepGoing: "-- I think we're just going to be here, tasting sauce, forever.", whatBeat: "What?", circular: "Leaving. Taste it. Same as every time.", cutSelf: "Anyway-- save me a plate for whichever loop this bread finishes in.", hintGuestReact: "Take the bread. Just take the bread this time." }
+      }
+    },
+    Wendy: {
+      mechanic: "sentimental", gender: "f",
+      hintAsk: "Oh -- and please say bye to {next} too.",
+      lines: {
+        fresh: { hook: "Wait -- no -- come here, come here.", mid: "I just love you SO much, this has been the best night.", whatBeat: "Hm?", last: "Never change, okay? Never change!", hintGuestReact: "Okay! Go! Love you!" },
+        tier1: { hook: "Come here one more time though.", mid: "I know, I know -- I don't know why I'm crying again.", whatBeat: "Sorry, what?", last: "This keeps happening, but I mean it every time!", hintGuestReact: "Okay. Love you. Bless them, honestly." },
+        tier2: { hook: "Wait, is this -- have we done this? Doesn't matter, come here.", mid: "This is genuinely strange, but mostly I just love you.", whatBeat: "What -- are you okay?", last: "I don't understand what's happening but I love all of you!", hintGuestReact: "Are you actually upset? Come here." },
+        tier3: { hook: "Come here. I don't care if this is the fourth time.", mid: "Something is wrong here, and also I love you so much.", whatBeat: "Wait -- are you actually upset?", last: "I am slightly concerned, but mostly I love you!", hintGuestReact: "Come here. You look shattered. Sit down a second." },
+        tier4: { hook: "Come here. Every single time, I mean it just as much.", mid: "I don't understand this evening anymore but I love every version of it.", whatBeat: "Are you alright, though? Really?", last: "I love you. I don't need to understand it to love it!", hintGuestReact: "Come here. It's okay. I've got you. Whatever this is." }
+      }
+    },
+    Lena: {
+      mechanic: "sentimental", gender: "f",
+      hintAsk: "Oh -- and {next}!! Don't skip {pron_obj}.",
+      lines: {
+        fresh: { hook: "NO. Don't. It's just getting GOOD.", mid: "One more drink and then you can leave, I promise.", whatBeat: "WHAT.", last: "Fine! Go, ruin the best night of my LIFE -- okay I care, bye, love you!", hintGuestReact: "See! This is what I mean, it's SO good tonight!" },
+        tier1: { hook: "It's STILL just getting good, somehow.", mid: "One more dance and then you can leave, I mean it.", whatBeat: "Sorry, what?", last: "This keeps being the best night of my life, love you, bye!", hintGuestReact: "You're getting so INTO it tonight, I love that for you." },
+        tier2: { hook: "Wait -- THIRD time? Okay that's -- no, it's STILL just getting good!", mid: "One more drink, I mean it this time, probably.", whatBeat: "What's wrong -- oh my god, are you having the best night too?", last: "I don't understand what's happening but it's the best night, love you!", hintGuestReact: "You're SO into this tonight. I love it. I love YOU." },
+        tier3: { hook: "Four times?! That is genuinely wild, and I danced on the table earlier.", mid: "One more, I promise, this is clearly a whole THING now.", whatBeat: "Are you -- wait, is this the best night of YOUR life too?", last: "This might be the best night of my entire LIFE, on a loop, love you!", hintGuestReact: "You're being SO intense right now, I am obsessed with it." },
+        tier4: { hook: "At this point I'm just going to assume it's always just getting good.", mid: "One more, obviously, it's basically tradition now.", whatBeat: "This is definitely the best night either of us has ever had, right?", last: "Best night of my life, on repeat, and I am HERE for it, love you!", hintGuestReact: "I've never seen you this into a party. I love it." }
+      }
+    },
+    Sarah: {
+      mechanic: "clingy", gender: "f",
+      hintAsk: "Oh -- and don't forget {next} before you go.",
+      lines: {
+        fresh: { hook: "Oh -- wait, sit down a sec.", ask: "Have you eaten? Let me just -- do you want to take food with you?", declineNowClose: "Oh -- okay, fair enough! Text me when you're home.", stallLine: "Knew it. Right. Let me just sort you a plate.", acceptClose: "Okay, honestly, fine -- go, before I find you a doggy bag.", giveInClose: "One doggy bag. That's it. Then you're free. Probably.", hintGuestReact: "Go on then. Text me when you're home." },
+        tier1: { hook: "Wait -- sit down, just for a sec.", ask: "Did you eat this time? Let me just check -- take some food?", declineNowClose: "Okay, fine, go -- text me properly this time, though.", stallLine: "Knew it. Let me just sort you a plate, one sec.", acceptClose: "Fine. Go. I feel like we've done this bit, but fine.", giveInClose: "Just -- take the crisps. Please. Least I can do.", hintGuestReact: "Go on then. You look a bit tired, love." },
+        tier2: { hook: "Okay we have done this. Sit. Down.", ask: "Have I fed you already tonight? I can't remember. Let me check.", declineNowClose: "Fine, go -- I'm putting food in your hand on the way past.", stallLine: "Right. Plate. Now. I don't trust myself to remember.", acceptClose: "Go, honestly, before I make you a second plate.", giveInClose: "Take the crisps. And the sausage things. Not leaving hungry.", hintGuestReact: "Okay, okay. Sit down. You look shattered." },
+        tier3: { hook: "This is -- what, the fourth time? Sit down.", ask: "Fourth plate of the night, is it? I don't care if you've eaten.", declineNowClose: "Go. I mean it. Actually I don't know if I mean it.", stallLine: "There. Now go. Well -- after this.", acceptClose: "Go, go, go -- see you again in about ten minutes apparently.", giveInClose: "Fine. Crisps. Always crisps. It's a whole thing now.", hintGuestReact: "Okay. Sit. Down. You look absolutely done in." },
+        tier4: { hook: "Hi. Me again. Sit.", ask: "Not even going to ask if you've eaten. Here. Take this.", declineNowClose: "Go. Text me. Or don't, I'll see you in five minutes anyway.", stallLine: "There we go. Efficient, this time.", acceptClose: "Go on then. This is genuinely my favourite part of the night now.", giveInClose: "Take it. I keep a plate ready now. This is just how it works.", hintGuestReact: "Sit down, love. Have a biscuit. You've earned it." }
+      }
+    },
+    Dave: {
+      mechanic: "clingy", gender: "m",
+      hintAsk: "And {next}, mate -- can't skip {pron_obj}.",
+      lines: {
+        fresh: { hook: "Mate. Mate, no. Sit down a sec.", ask: "One more, come on, good man.", declineNowClose: "Fair enough, mate. Straight out, no messing about.", stallLine: "Knew it. That's the spirit. *pours one*", acceptClose: "Alright, alright. Go on then, matey. Get home safe.", giveInClose: "Alright, alright -- ONE more, then you're out, deal?", hintGuestReact: "Go on then, good man." },
+        tier1: { hook: "Mate. Come here a sec.", ask: "You always say that. One more, come on.", declineNowClose: "Fair enough. No arguments this time, mate.", stallLine: "Knew it! Every time, mate, every time.", acceptClose: "Fine. Fair enough. Off you pop, matey.", giveInClose: "One more. I mean it. Well -- meant it last time too.", hintGuestReact: "You're getting worked up. One more?" },
+        tier2: { hook: "This is the third one of these, mate.", ask: "Third one, is it? Good stats. One more though.", declineNowClose: "Respect. Sober exits, that's the dream, mate.", stallLine: "Every single time. It's basically a ritual now.", acceptClose: "Go on. I'll get the next one ready for round four.", giveInClose: "One more. Basically part of the process now.", hintGuestReact: "You're getting worked up, mate. One more'll sort it." },
+        tier3: { hook: "This is number four, mate.", ask: "Four?! Legend. One more for the road though.", declineNowClose: "Fair enough. Four sober exits. Impressive, honestly.", stallLine: "Course you did. It's tradition now, mate.", acceptClose: "Go on then, mate. See you in five, knowing you.", giveInClose: "One more. Not even a question anymore, is it.", hintGuestReact: "You're properly worked up now, mate. One more, go on." },
+        tier4: { hook: "Lost count of which one this is, mate.", ask: "Lost count?! Respect. One more anyway, for the record.", declineNowClose: "Fair play. Go on then, matey, get out while you can.", stallLine: "Obviously. Basically muscle memory now, mate.", acceptClose: "Go on. See you in a bit, same as always.", giveInClose: "One more. This is just what we do now, isn't it.", hintGuestReact: "You're always worked up by this bit, mate. One more." }
+      }
+    },
+    Farah: {
+      mechanic: "clingy", gender: "f",
+      hintAsk: "And {next}, apparently.",
+      lines: {
+        fresh: { hook: "You're leaving? Lucky you.", ask: "Genuinely. Five more minutes, though?", declineNowClose: "Fair enough. Wise, honestly. Go on then.", stallLine: "Knew you'd cave. Sit back down.", acceptClose: "Go on then. Text me when you're home.", giveInClose: "Five minutes. Then go. Unlike everyone else here, I mean it.", hintGuestReact: "Go on then. Good luck." },
+        tier1: { hook: "You said that already. Lucky you, still.", ask: "Five minutes?", declineNowClose: "Fair enough. Smarter than the rest of us, honestly.", stallLine: "Knew it. Don't blame you for staying, honestly.", acceptClose: "Go. Please. Send a text. Take me with you, mentally.", giveInClose: "Fine. Five minutes. I'll time it. Nothing else to do.", hintGuestReact: "Yeah. I've noticed." },
+        tier2: { hook: "Third time saying this. I don't love what that says about me.", ask: "Third. Keeping count now, for what it's worth. Five minutes?", declineNowClose: "There it is. Genuinely proud of you for that one.", stallLine: "Called it. Remarkably little willpower, you know.", acceptClose: "Go. I'll be here. Always here, apparently, watching this.", giveInClose: "Five minutes. On the record, this is your choice, not mine.", hintGuestReact: "Yeah. I've noticed. I notice most things." },
+        tier3: { hook: "This is the fourth one of these. I really mean that more than usual.", ask: "Four. That's not a party anymore, that's a pattern. Five minutes?", declineNowClose: "There it is. Took you four tries, but there it is.", stallLine: "Predictable. Comfortingly so, at this point.", acceptClose: "Go on. Respect the persistence, even if the results don't.", giveInClose: "Five minutes. Not even surprised anymore. Sit.", hintGuestReact: "Yeah. Noticed a while ago, actually." },
+        tier4: { hook: "I've lost count, and honestly, so have you.", ask: "Stopped counting. Five minutes, out of habit more than hope.", declineNowClose: "There it is. Eventually. Well done, I suppose.", stallLine: "Naturally. This is basically our whole relationship now.", acceptClose: "Go. Text me. Or don't -- see you in five, statistically.", giveInClose: "Five minutes. Less a request now, more a law of physics.", hintGuestReact: "Yeah. Noticed hours ago. Go on." }
+      }
+    }
+  };
+
+  var TIER_KEYS = ['fresh', 'tier1', 'tier2', 'tier3', 'tier4'];
+
+  function characterFor(name){
+    var base = name.replace(/ \(again\)$/, '');
+    return CHARACTERS[base] || CHARACTERS.Sarah;
+  }
+
+  var FLOOR_SPOTS = [];
+  for (var gy=1; gy<ROWS-1; gy++){
+    for (var gx=1; gx<COLS-1; gx++){
+      if (!solidAt(gx,gy)) FLOOR_SPOTS.push([gx,gy]);
+    }
+  }
+  function farFromDoor(spot){
+    var dx = spot[0]-15, dy = spot[1]-4;
+    return (dx*dx+dy*dy) > 9;
+  }
+  function randomSpot(exclude){
+    var pool = FLOOR_SPOTS.filter(function(s){
+      if (!farFromDoor(s)) return false;
+      for (var i=0;i<exclude.length;i++){
+        if (exclude[i][0]===s[0] && exclude[i][1]===s[1]) return false;
+      }
+      return true;
+    });
+    if (!pool.length) pool = FLOOR_SPOTS;
+    return pool[(Math.random()*pool.length)|0];
+  }
+
+  // ---------- state ----------
+  var STATE_TITLE = 0, STATE_PLAY = 1, STATE_DIALOGUE = 2;
+  var state = STATE_TITLE;
+
+  var player = { gx:2, gy:5, facing:'down', moveT:0 };
+  var guests = [];      // active guests on the floor
+  var queue = [];        // ids currently pending a goodbye, in required order
+  var roster = [];       // every guest id ever, in the order they first arrived
+  var loopCount = 0;
+  var goodbyesRemaining = 0;
+  var lastFarewellName = null;  // who you most recently said a proper goodbye to
+
+  function guestById(id){
+    for (var i=0;i<guests.length;i++) if (guests[i].id === id) return guests[i];
+    return null;
+  }
+
+  var dialogue = { steps: [], idx:0, selected:0, active:false, onDone:null };
+
+  function occupiedSpots(){
+    var arr = [[player.gx,player.gy],[15,4]];
+    guests.forEach(function(g){ arr.push([g.gx,g.gy]); });
+    return arr;
+  }
+
+  function spawnGuest(name, spot){
+    var col = GUEST_COLORS[(Math.random()*GUEST_COLORS.length)|0];
+    var g = {
+      id: 'g'+Math.random().toString(36).slice(2),
+      name: name, gx: spot[0], gy: spot[1],
+      color: col[0], shade: col[1],
+      hat: Math.random() < 0.5,
+      bob: Math.random()*Math.PI*2,
+      farewelled: false,
+      arrival: false,
+      facing: 'down',
+      nextMoveAt: 0
+    };
+    guests.push(g);
+    roster.push(g.id);
+    return g;
+  }
+
+  function startRound1(){
+    guests = []; queue = []; roster = []; namePtr = 0; loopCount = 0; lastFarewellName = null;
+    player.gx = 2; player.gy = 5;
+    var names = [];
+    for (var i=0;i<7;i++) names.push(nextName());
+    var used = [[player.gx,player.gy],[15,4]];
+    names.forEach(function(n){
+      var spot = randomSpot(used);
+      used.push(spot);
+      var g = spawnGuest(n, spot);
+      queue.push(g.id);
+    });
+    goodbyesRemaining = queue.length;
+  }
+
+  function currentTarget(){
+    if (!queue.length) return null;
+    var id = queue[0];
+    for (var i=0;i<guests.length;i++) if (guests[i].id===id) return guests[i];
+    return null;
+  }
+
+  // ---------- dialogue content ----------
+  function tier(){ return Math.min(loopCount, 4); }
+  function effectiveTier(guest){ return guest.arrival ? 0 : tier(); }
+
+  var PRONOUNS = {
+    m: { subj:'he', subjCap:'He', obj:'him' },
+    f: { subj:'she', subjCap:'She', obj:'her' }
+  };
+
+  // {name} = the guest you're talking to, {next} = who they'll point you at,
+  // {pron}/{Pron}/{pron_obj} = the pronoun of whoever {next} refers to.
+  function sub(str, guest, nextName, nextGender){
+    if (!str) return str;
+    var p = PRONOUNS[nextGender] || PRONOUNS.f;
+    return str.split('{name}').join(guest.name)
+      .split('{next}').join(nextName || '')
+      .split('{Pron}').join(p.subjCap)
+      .split('{pron}').join(p.subj)
+      .split('{pron_obj}').join(p.obj);
+  }
+
+  // The player is a character too, with one evolving voice that persists
+  // across every guest -- polite and a bit distracted at first, then
+  // increasingly direct, suspicious, and finally just flatly exhausted.
+  var OPENER = [
+    "Hey {name}, I think I'm gonna head off.",
+    "{name}, I'm off again.",
+    "{name}. I need to go. Again.",
+    "{name}. I've done this. I'm leaving.",
+    "{name}. I really must go."
+  ];
+  var PUSH = [
+    "No, honestly, I do have to go.",
+    "No, I mean it this time.",
+    "I know. I'm still leaving, though.",
+    "I'm not doing the whole thing again.",
+    "Yeah. Still leaving."
+  ];
+  var CLARIFY = [
+    "It's me! Just heading home, that's all.",
+    "Yeah -- it's me. Still heading home.",
+    "Same as before. I'm leaving.",
+    "You know who I am. I'm leaving.",
+    "Still me. Still leaving."
+  ];
+  var LEAVING = [
+    "I'm leaving.",
+    "I'm leaving. Properly, this time.",
+    "I'm leaving. Same as before.",
+    "I'm leaving. You know this.",
+    "Leaving."
+  ];
+  var GIVE_UP = ["...Okay.", "Sure.", "Right.", "Whatever you say.", "Fine."];
+  var HINT_REACT = [
+    "Yeah, okay.",
+    "I've already said goodbye to {next}, though.",
+    "I have said goodbye to {next} three times now.",
+    "{next}. I KNOW about {next}.",
+    "{next}. Right. {next}."
+  ];
+
+  // from loop 2 onward, a guest's hint sometimes gets this uncanny little
+  // stumble instead of the usual reaction -- planted here rather than in
+  // any one character's voice, since it isn't really about them
+  function hintTail(guest, nextName, nextGender, t, hintGuestReactText){
+    if (t === 0 && guest.name !== 'Carlos' && guest.name !== 'Mia' && Math.random() < 0.3){
+      return [
+        {type:'line', who:'you', text:"Wait -- have I already said bye to " + nextName + "?"},
+        {type:'line', who:guest.name, text:"Have you?"},
+        {type:'line', who:'you', text:"...No. Never mind."},
+        {type:'line', who:guest.name, text:"Right. Well -- say bye anyway.", end:true}
+      ];
+    }
+    return [
+      {type:'line', who:'you', text: sub(HINT_REACT[t], guest, nextName, nextGender)},
+      {type:'line', who:guest.name, text: hintGuestReactText, end:true}
+    ];
+  }
+
+  function appendHint(steps, guest, nextName, nextGender, t, hintAskTemplate, hintGuestReactText){
+    if (!nextName || !hintAskTemplate){
+      steps[steps.length - 1].end = true;
+      return steps;
+    }
+    steps.push({type:'line', who:guest.name, text: sub(hintAskTemplate, guest, nextName, nextGender)});
+    return steps.concat(hintTail(guest, nextName, nextGender, t, hintGuestReactText));
+  }
+
+  // clingy needs a fixed-length hint tail so the choice-branch indices below
+  // stay correct regardless of randomness
+  function hintBeatFixed(guest, nextName, nextGender, t, hintAskTemplate, hintGuestReactText){
+    if (!nextName || !hintAskTemplate){
+      return [{type:'line', who:guest.name, text:"Anyway -- night!", end:true}];
+    }
+    return [
+      {type:'line', who:guest.name, text: sub(hintAskTemplate, guest, nextName, nextGender)},
+      {type:'line', who:'you', text: sub(HINT_REACT[t], guest, nextName, nextGender)},
+      {type:'line', who:guest.name, text: hintGuestReactText, end:true}
+    ];
+  }
+
+  function assembleChill(guest, ch, L, nextName, nextGender, t){
+    var steps = [
+      {type:'line', who:'you', text: sub(OPENER[t], guest, nextName, nextGender)},
+      {type:'line', who:guest.name, text: L.theirs}
+    ];
+    return appendHint(steps, guest, nextName, nextGender, t, ch.hintAsk, L.hintGuestReact);
+  }
+
+  function assembleOblivious(guest, ch, L, nextName, nextGender, t){
+    // no name/what/leaving beat here -- that repeat belongs to Mike's
+    // story-that-won't-end joke, not to every mechanic in the game
+    var steps = [
+      {type:'line', who:'you', text: sub(OPENER[t], guest, nextName, nextGender)},
+      {type:'line', who:guest.name, text: L.q},
+      {type:'line', who:'you', text: sub(PUSH[t], guest, nextName, nextGender)},
+      {type:'line', who:guest.name, text: L.confuse2},
+      {type:'line', who:guest.name, text: L.close}
+    ];
+    return appendHint(steps, guest, nextName, nextGender, t, ch.hintAsk, L.hintGuestReact);
+  }
+
+  function assembleChatty(guest, ch, L, nextName, nextGender, t){
+    var steps = [
+      {type:'line', who:'you', text: sub(OPENER[t], guest, nextName, nextGender)},
+      {type:'line', who:guest.name, text: L.hook},
+      {type:'line', who:'you', text: sub(PUSH[t], guest, nextName, nextGender)},
+      {type:'line', who:guest.name, text: L.keepGoing},
+      {type:'line', who:'you', text: guest.name + "."},
+      {type:'line', who:guest.name, text: L.whatBeat},
+      {type:'line', who:'you', text: sub(LEAVING[t], guest, nextName, nextGender)},
+      {type:'line', who:guest.name, text: L.circular},
+      {type:'line', who:'you', text: GIVE_UP[t]},
+      {type:'line', who:guest.name, text: L.cutSelf}
+    ];
+    return appendHint(steps, guest, nextName, nextGender, t, ch.hintAsk, L.hintGuestReact);
+  }
+
+  function assembleSentimental(guest, ch, L, nextName, nextGender, t){
+    // same reasoning as oblivious -- drop the name/what/leaving beat so this
+    // doesn't read like the same exchange as every other conversation
+    var steps = [
+      {type:'line', who:'you', text: sub(OPENER[t], guest, nextName, nextGender)},
+      {type:'line', who:guest.name, text: L.hook},
+      {type:'line', who:'you', text: sub(PUSH[t], guest, nextName, nextGender)},
+      {type:'line', who:guest.name, text: L.mid},
+      {type:'line', who:guest.name, text: L.last}
+    ];
+    return appendHint(steps, guest, nextName, nextGender, t, ch.hintAsk, L.hintGuestReact);
+  }
+
+  function assembleClingy(guest, ch, L, nextName, nextGender, t){
+    var steps = [];
+    steps.push({type:'line', who:'you', text: sub(OPENER[t], guest, nextName, nextGender)});
+    steps.push({type:'line', who:guest.name, text: L.hook});
+    steps.push({type:'line', who:'you', text: sub(PUSH[t], guest, nextName, nextGender)});
+    steps.push({type:'line', who:guest.name, text: L.ask});
+
+    var choice1Index = steps.length;
+    steps.push(null);
+
+    var declineIndex = steps.length;
+    steps.push({type:'line', who:guest.name, text: L.declineNowClose});
+    steps = steps.concat(hintBeatFixed(guest, nextName, nextGender, t, ch.hintAsk, L.hintGuestReact));
+
+    var stallIndex = steps.length;
+    steps.push({type:'line', who:guest.name, text: L.stallLine});
+
+    var choice2Index = steps.length;
+    steps.push(null);
+
+    var acceptIndex = steps.length;
+    steps.push({type:'line', who:guest.name, text: L.acceptClose});
+    steps = steps.concat(hintBeatFixed(guest, nextName, nextGender, t, ch.hintAsk, L.hintGuestReact));
+
+    var giveInIndex = steps.length;
+    steps.push({type:'line', who:guest.name, text: L.giveInClose});
+    steps = steps.concat(hintBeatFixed(guest, nextName, nextGender, t, ch.hintAsk, L.hintGuestReact));
+
+    steps[choice1Index] = {type:'choice', options:[
+      {label:"Okay, five more minutes", next: stallIndex},
+      {label:"No, I really have to go", next: declineIndex}
+    ]};
+    steps[choice2Index] = {type:'choice', options:[
+      {label:"Okay, I really do have to go now", next: acceptIndex},
+      {label:"...fine, ONE more", next: giveInIndex}
+    ]};
+    return steps;
+  }
+
+  var MECHANIC_ASSEMBLERS = {
+    chill: assembleChill,
+    sentimental: assembleSentimental,
+    oblivious: assembleOblivious,
+    chatty: assembleChatty,
+    clingy: assembleClingy
+  };
+
+  function buildScript(guest, nextName, t){
+    var ch = characterFor(guest.name);
+    var L = ch.lines[TIER_KEYS[t]] || ch.lines.fresh;
+    var nextGender = nextName ? characterFor(nextName).gender : null;
+    var assemble = MECHANIC_ASSEMBLERS[ch.mechanic] || assembleChill;
+    return assemble(guest, ch, L, nextName, nextGender, t);
+  }
+
+  function alreadySaidByeSteps(guest){
+    var t = effectiveTier(guest);
+    var lines = [
+      "We already did the whole goodbye thing!",
+      "Yes, yes, you already left. Sort of.",
+      "We've said goodbye a worrying number of times now.",
+      "Okay, I'm not doing this again, I remember this one.",
+      "Again? We are BOTH going to be here forever at this rate."
+    ];
+    return [ {type:'line', who:guest.name, text:lines[Math.min(t,lines.length-1)], end:true} ];
+  }
+
+  function waitSteps(guest, target){
+    var t = effectiveTier(guest);
+    var mineLines = [
+      "Oh -- sorry, I'm just trying to find the door!",
+      "Sorry, sorry -- still working my way round.",
+      "I know, I know, I'm not done yet.",
+      "I really must go, I'm just doing it in the wrong order apparently.",
+      "Sorry -- wrong one. Again."
+    ];
+    var theirsLines;
+    if (t === 0) theirsLines = "Oh! You haven't said bye to " + target.name + " yet!";
+    else if (t === 1) theirsLines = "You're doing this again? Go find " + target.name + ".";
+    else if (t === 2) theirsLines = "You're still here? Go bother " + target.name + " instead.";
+    else if (t === 3) theirsLines = "We are all still here. Try " + target.name + ", not me.";
+    else theirsLines = target.name + ". It's always " + target.name + " now, isn't it.";
+    return [ {type:'line', who:'you', text:mineLines[Math.min(t,mineLines.length-1)]}, {type:'line', who:guest.name, text:theirsLines, end:true} ];
+  }
+
+  function doorSteps(){
+    var t = tier();
+    var lines = [
+      "Okay, honestly, I've still got people to say bye to.",
+      "No, not yet -- someone will notice.",
+      "Nope. The door hasn't earned it yet.",
+      "Everyone would just say hi again anyway, wouldn't they.",
+      "I really must go. The door knows that. The door doesn't care."
+    ];
+    return [ {type:'line', who:'you', text:lines[Math.min(t,lines.length-1)], end:true} ];
+  }
+
+  var DANCE_LINES = [
+    "Oh my god, I LOVE this song!",
+    "Wait, is this-- yeah, this is my song.",
+    "Shh, listen, this is the best bit.",
+    "This bassline, though.",
+    "Ugh, I can't leave now, this tune's incredible.",
+    "Two more seconds, I need to hear the drop.",
+    "This is basically the best song ever written."
+  ];
+  function danceLine(){ return DANCE_LINES[(Math.random()*DANCE_LINES.length)|0]; }
+
+  function withDanceComment(steps, guest){
+    if (!isDanceFloor(guest.gx, guest.gy)) return steps;
+    for (var i=0;i<steps.length;i++){
+      if (steps[i].type === 'line' && steps[i].who === guest.name){
+        var copy = steps.slice();
+        var line = copy[i];
+        copy[i] = { type:'line', who:line.who, text: danceLine() + " " + line.text, end: line.end };
+        return copy;
+      }
+    }
+    return steps;
+  }
+
+  function shuffleArray(arr){
+    var a = arr.slice();
+    for (var i=a.length-1;i>0;i--){
+      var j = (Math.random()*(i+1))|0;
+      var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+
+  var CALLBACK_LINES = [
+    "Oh -- did you just do the whole thing with {name}?",
+    "Wait, weren't you just saying bye to {name}?",
+    "I saw you with {name} a second ago -- how'd that go?",
+    "Did {name} keep you as long as usual?",
+    "Is {name} alright? {Pron} looked a bit emotional back there."
+  ];
+  function callbackLine(lastName, lastGender){
+    var p = PRONOUNS[lastGender] || PRONOUNS.f;
+    var t = CALLBACK_LINES[(Math.random()*CALLBACK_LINES.length)|0];
+    return t.split('{name}').join(lastName).split('{Pron}').join(p.subjCap);
+  }
+
+  // from loop 2 onward, a guest might reference the person you just farewelled
+  function withCallbackComment(steps, guest, t){
+    if (t < 1) return steps;
+    if (!lastFarewellName || lastFarewellName === guest.name) return steps;
+    if (Math.random() > 0.4) return steps;
+    var lastChar = characterFor(lastFarewellName);
+    var line = callbackLine(lastFarewellName, lastChar.gender);
+    for (var i=0;i<steps.length;i++){
+      if (steps[i].type === 'line' && steps[i].who === guest.name){
+        var copy = steps.slice();
+        var s = copy[i];
+        copy[i] = { type:'line', who:s.who, text: line + " " + s.text, end: s.end };
+        return copy;
+      }
+    }
+    return steps;
+  }
+
+  var ARRIVAL_REASONS = [
+    "has come back to the party from the off license with more booze",
+    "has come back to the party from the kitchen with a fresh bag of crisps",
+    "has come back to the party from the garden, still holding a cigarette",
+    "has finally made it back from the bathroom queue",
+    "has come back to the party from the car with a different speaker",
+    "has come back to the party from the corner shop with more ice"
+  ];
+
+  // ---------- dialogue box control ----------
+  function currentStep(){ return dialogue.steps[dialogue.idx]; }
+
+  function gotoStep(i){
+    if (i >= dialogue.steps.length){ closeDialogue(); return; }
+    dialogue.idx = i;
+    dialogue.selected = 0;
+  }
+
+  function openScript(steps, onDone){
+    dialogue.steps = steps;
+    dialogue.active = true;
+    dialogue.onDone = onDone || null;
+    state = STATE_DIALOGUE;
+    gotoStep(0);
+  }
+
+  function closeDialogue(){
+    dialogue.active = false;
+    state = STATE_PLAY;
+    var cb = dialogue.onDone; dialogue.onDone = null;
+    if (cb) cb();
+  }
+
+  function advanceDialogue(){
+    var step = currentStep();
+    if (!step){ closeDialogue(); return; }
+    if (step.type === 'choice') return;
+    if (step.end){ closeDialogue(); return; }
+    gotoStep(dialogue.idx+1);
+  }
+
+  function chooseOption(i){
+    var step = currentStep();
+    if (!step || step.type !== 'choice') return;
+    var opt = step.options[i];
+    if (!opt) return;
+    gotoStep(opt.next);
+  }
+
+  function sayGoodbyeTo(guest){
+    guest.farewelled = true;
+    lastFarewellName = guest.name;
+    queue.shift();
+    goodbyesRemaining = queue.length;
+    if (queue.length === 0){
+      spawnArrival();
+    }
+  }
+
+  function spawnArrival(){
+    var name = nextName();
+    var reason = ARRIVAL_REASONS[(Math.random()*ARRIVAL_REASONS.length)|0];
+    var used = occupiedSpots();
+    var spot = randomSpot(used);
+    var g = spawnGuest(name, spot);
+    g.arrival = true;
+    queue = [g.id];
+    goodbyesRemaining = queue.length;
+    var steps = [
+      {type:'line', who:'SYSTEM', text: name + " " + reason + ".", system:true, end:true}
+    ];
+    openScript(steps, null);
+  }
+
+  function resetRoster(excludeId, order){
+    loopCount++;
+    queue = order || shuffleArray(roster.filter(function(id){ return id !== excludeId; }));
+    queue.forEach(function(id){
+      var g = guestById(id);
+      if (g) g.farewelled = false;
+    });
+    goodbyesRemaining = queue.length;
+  }
+
+  function tryTalk(guest){
+    var target = currentTarget();
+    if (guest.farewelled){
+      openScript(alreadySaidByeSteps(guest), null);
+      return;
+    }
+    if (target && target.id === guest.id){
+      var t = effectiveTier(guest);
+      var nextName_ = null;
+      var newOrder = null;
+      if (guest.arrival){
+        // the new loop's order shuffles here so the arrival's hint always
+        // points at whoever the reshuffled queue will actually start with
+        newOrder = shuffleArray(roster.filter(function(id){ return id !== guest.id; }));
+        var firstGuest = newOrder.length ? guestById(newOrder[0]) : null;
+        nextName_ = firstGuest ? firstGuest.name : null;
+      } else {
+        var afterId = queue[1];
+        if (afterId){
+          var afterGuest = guestById(afterId);
+          nextName_ = afterGuest ? afterGuest.name : null;
+        }
+      }
+      var steps = withCallbackComment(withDanceComment(buildScript(guest, nextName_, t), guest), guest, t);
+      openScript(steps, function(){
+        lastFarewellName = guest.name;
+        if (guest.arrival){
+          guest.farewelled = true;
+          guest.arrival = false;
+          resetRoster(guest.id, newOrder);
+        } else {
+          sayGoodbyeTo(guest);
+        }
+      });
+    } else {
+      openScript(waitSteps(guest, target), null);
+    }
+  }
+
+  function tryDoor(){
+    openScript(doorSteps(), null);
+  }
+
+  // ---------- ambient guest movement ----------
+  function tileOccupied(gx, gy, excludeGuest){
+    if (player.gx === gx && player.gy === gy) return true;
+    for (var i=0;i<guests.length;i++){
+      var g = guests[i];
+      if (g !== excludeGuest && g.gx === gx && g.gy === gy) return true;
+    }
+    return false;
+  }
+
+  var WANDER_DIRS = [[0,-1,'up'],[0,1,'down'],[-1,0,'left'],[1,0,'right']];
+
+  function updateGuestAI(t){
+    guests.forEach(function(g){
+      if (t < g.nextMoveAt) return;
+      g.nextMoveAt = t + 1200 + Math.random()*2600;
+      if (Math.random() > 0.45) return; // often just lingers -- gathering, chatting
+      var dirs = WANDER_DIRS.slice().sort(function(){ return Math.random()-0.5; });
+      for (var i=0;i<dirs.length;i++){
+        var nx = g.gx+dirs[i][0], ny = g.gy+dirs[i][1];
+        if (isDoor(nx,ny)) continue;
+        if (solidAt(nx,ny)) continue;
+        if (tileOccupied(nx,ny,g)) continue;
+        g.gx = nx; g.gy = ny; g.facing = dirs[i][2];
+        break;
+      }
+    });
+  }
+
+  // ---------- input ----------
+  var lastMove = 0;
+  var MOVE_INTERVAL = 100;
+
+  var DIR_KEYS = {
+    'ArrowUp':[0,-1,'up'], 'w':[0,-1,'up'], 'W':[0,-1,'up'],
+    'ArrowDown':[0,1,'down'], 's':[0,1,'down'], 'S':[0,1,'down'],
+    'ArrowLeft':[-1,0,'left'], 'a':[-1,0,'left'], 'A':[-1,0,'left'],
+    'ArrowRight':[1,0,'right'], 'd':[1,0,'right'], 'D':[1,0,'right']
+  };
+
+  function attemptMove(dx, dy, facing){
+    var now = performance.now();
+    if (now - lastMove < MOVE_INTERVAL) return;
+    lastMove = now;
+    player.facing = facing;
+    var nx = player.gx+dx, ny = player.gy+dy;
+
+    if (isDoor(nx,ny)){ tryDoor(); return; }
+    if (solidAt(nx,ny)) return;
+
+    var bump = null;
+    for (var i=0;i<guests.length;i++){
+      if (guests[i].gx===nx && guests[i].gy===ny){ bump = guests[i]; break; }
+    }
+    if (bump){ tryTalk(bump); return; }
+
+    player.gx = nx; player.gy = ny;
+  }
+
+  window.addEventListener('keydown', function(e){
+    var k = e.key;
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Enter','w','a','s','d','W','A','S','D'].indexOf(k) !== -1){
+      e.preventDefault();
+    }
+
+    if (state === STATE_TITLE){
+      if (k === ' ' || k === 'Enter'){ beginGame(); }
+      return;
+    }
+    if (state === STATE_DIALOGUE){
+      var step = currentStep();
+      if (step && step.type === 'choice'){
+        if (k === 'ArrowUp'){ dialogue.selected = (dialogue.selected + step.options.length - 1) % step.options.length; }
+        else if (k === 'ArrowDown'){ dialogue.selected = (dialogue.selected + 1) % step.options.length; }
+        else if (k === ' ' || k === 'Enter'){ chooseOption(dialogue.selected); }
+        else if (k === '1'){ chooseOption(0); }
+        else if (k === '2'){ chooseOption(1); }
+        return;
+      }
+      if (k === ' ' || k === 'Enter'){ advanceDialogue(); }
+      return;
+    }
+    if (state === STATE_PLAY && DIR_KEYS[k]){
+      var d = DIR_KEYS[k];
+      attemptMove(d[0], d[1], d[2]);
+    }
+  });
+
+  canvas.addEventListener('click', function(){
+    if (state === STATE_TITLE) beginGame();
+    else if (state === STATE_DIALOGUE) advanceDialogue();
+  });
+
+  function beginGame(){
+    startRound1();
+    state = STATE_PLAY;
+    startMusic();
+  }
+
+  // ---------- drawing ----------
+  function px(n){ return Math.round(n); }
+
+  var DISCO_COLORS = ['#ff3d7f','#38e6ff','#ffcf3d','#8a4dff'];
+
+  function drawFloorAndWalls(t){
+    for (var gy=0; gy<ROWS; gy++){
+      for (var gx=0; gx<COLS; gx++){
+        var c = MAP[gy][gx];
+        var x = gx*TILE, y = STATUS_H + gy*TILE;
+        if (c === '#'){
+          ctx.fillStyle = '#22284a';
+          ctx.fillRect(x,y,TILE,TILE);
+          ctx.fillStyle = '#171b33';
+          ctx.fillRect(x,y,TILE,3);
+          ctx.fillRect(x,y,3,TILE);
+        } else if (c === 'D'){
+          ctx.fillStyle = '#171b33';
+          ctx.fillRect(x,y,TILE,TILE);
+          ctx.fillStyle = '#5ee6c8';
+          ctx.fillRect(x+2,y+2,TILE-6,TILE-4);
+          ctx.fillStyle = '#0d1321';
+          ctx.fillRect(x+TILE-8,y+TILE/2-1,3,3);
+        } else if (isDanceFloor(gx,gy)){
+          ctx.fillStyle = DISCO_COLORS[(gx+gy)%4];
+          ctx.fillRect(x,y,TILE,TILE);
+          var pulse = (Math.sin((t||0)*0.004 + gx*0.9 + gy*1.3) + 1) / 2;
+          ctx.fillStyle = 'rgba(255,255,255,' + (0.12 + pulse*0.28) + ')';
+          ctx.fillRect(x,y,TILE,TILE);
+          ctx.strokeStyle = 'rgba(0,0,0,.25)';
+          ctx.strokeRect(x+0.5,y+0.5,TILE-1,TILE-1);
+        } else {
+          ctx.fillStyle = ((gx+gy)%2===0) ? '#e8c99b' : '#dfbd88';
+          ctx.fillRect(x,y,TILE,TILE);
+        }
+      }
+    }
+    // furniture on top
+    FURNITURE.forEach(function(f){
+      var x2 = f.gx*TILE, y2 = STATUS_H + f.gy*TILE;
+      if (f.type === 'T'){
+        ctx.fillStyle = 'rgba(0,0,0,.22)';
+        ctx.fillRect(x2+2, y2+TILE-4, TILE-4, 2);
+        ctx.fillStyle = '#8a5a34';
+        ctx.fillRect(x2+1, y2+3, TILE-2, TILE-6);
+        ctx.fillStyle = '#5a3a1f';
+        ctx.fillRect(x2+1, y2+TILE-6, TILE-2, 3);
+        ctx.fillStyle = '#a97b4f';
+        ctx.fillRect(x2+1, y2+3, TILE-2, 2);
+        // two little drinks on top
+        ctx.fillStyle = '#f4ecd8';
+        ctx.fillRect(x2+5, y2+5, 3, 4);
+        ctx.fillRect(x2+TILE-8, y2+5, 3, 4);
+        ctx.fillStyle = '#ff5d73';
+        ctx.fillRect(x2+5, y2+7, 3, 2);
+        ctx.fillStyle = '#ffd257';
+        ctx.fillRect(x2+TILE-8, y2+7, 3, 2);
+      } else if (f.type === 'C'){
+        ctx.fillStyle = 'rgba(0,0,0,.2)';
+        ctx.fillRect(x2+1, y2+TILE-4, TILE-2, 2);
+        ctx.fillStyle = '#8b3f5e';
+        ctx.fillRect(x2+1, y2+6, TILE-2, TILE-8);
+        ctx.fillStyle = '#6c2e47';
+        ctx.fillRect(x2+1, y2+6, TILE-2, 3);
+        ctx.fillStyle = '#a85a78';
+        ctx.fillRect(x2+1, y2+6, 2, TILE-8);
+        ctx.strokeStyle = '#6c2e47';
+        ctx.beginPath();
+        ctx.moveTo(x2+TILE/2, y2+7); ctx.lineTo(x2+TILE/2, y2+TILE-3);
+        ctx.stroke();
+      }
+    });
+    // door label
+    ctx.fillStyle = '#5ee6c8';
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('EXIT', 16*TILE+2, STATUS_H+4*TILE+6);
+  }
+
+  function drawActor(gx,gy,bodyColor,shadeColor,facing,hat,bobPhase,t,dancing){
+    var x = gx*TILE, y = STATUS_H + gy*TILE;
+    var bobAmp = dancing ? 3 : 1;
+    var bobSpeed = dancing ? 0.02 : 0.006;
+    var bob = Math.sin((t||0)*bobSpeed + (bobPhase||0)) * bobAmp;
+    var sway = dancing ? Math.sin((t||0)*0.015 + (bobPhase||0)) * 2 : 0;
+    var cx = x + TILE/2, cy = y + TILE/2;
+    ctx.save();
+    ctx.translate(cx + sway, cy);
+    if (dancing) ctx.rotate(Math.sin((t||0)*0.015 + (bobPhase||0)) * 0.18);
+    ctx.translate(-cx, -cy);
+
+    var bx = x+3, by = y+3+bob;
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.fillRect(x+3,y+TILE-4,TILE-6,3);
+    ctx.fillStyle = shadeColor;
+    ctx.fillRect(bx, by+4, TILE-6, TILE-8);
+    ctx.fillStyle = bodyColor;
+    ctx.fillRect(bx, by+2, TILE-6, TILE-8);
+    // head
+    ctx.fillStyle = '#f2c9a0';
+    ctx.fillRect(bx+2, by-3, TILE-10, 7);
+    // eyes
+    ctx.fillStyle = '#171b33';
+    if (facing==='left'){ ctx.fillRect(bx+3, by, 2,2); }
+    else if (facing==='right'){ ctx.fillRect(bx+TILE-11, by, 2,2); }
+    else { ctx.fillRect(bx+3, by, 2,2); ctx.fillRect(bx+TILE-11, by, 2,2); }
+    if (hat){
+      ctx.fillStyle = '#ff5d73';
+      ctx.beginPath();
+      ctx.moveTo(bx+ (TILE-10)/2+2, by-9);
+      ctx.lineTo(bx+2, by-3);
+      ctx.lineTo(bx+TILE-8, by-3);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawPlayer(t){
+    var dancing = isDanceFloor(player.gx, player.gy);
+    drawActor(player.gx, player.gy, '#7ec4ff', '#3f8fd6', player.facing, false, 0, t, dancing);
+  }
+
+  function drawGuests(t){
+    var target = currentTarget();
+    guests.forEach(function(g){
+      ctx.globalAlpha = g.farewelled ? 0.4 : 1;
+      var dancing = isDanceFloor(g.gx, g.gy);
+      drawActor(g.gx, g.gy, g.color, g.shade, g.facing, g.hat, g.bob, t, dancing);
+      ctx.globalAlpha = 1;
+      if (target && target.id === g.id){
+        var x = g.gx*TILE, y = STATUS_H + g.gy*TILE;
+        var bob = Math.sin(t*0.006)*2;
+        ctx.fillStyle = '#ffd257';
+        ctx.beginPath();
+        ctx.moveTo(x+TILE/2, y-6+bob);
+        ctx.lineTo(x+TILE/2-4, y-1+bob);
+        ctx.lineTo(x+TILE/2+4, y-1+bob);
+        ctx.closePath();
+        ctx.fill();
+      }
+    });
+  }
+
+  function drawStatusBar(){
+    ctx.fillStyle = '#171b33';
+    ctx.fillRect(0,0,canvas.width,STATUS_H);
+    ctx.fillStyle = '#2a3559';
+    ctx.fillRect(0,STATUS_H-2,canvas.width,2);
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffd257';
+    ctx.textAlign = 'left';
+    ctx.fillText('GOODBYES: ' + goodbyesRemaining, 4, STATUS_H/2);
+    ctx.fillStyle = '#a9a3c9';
+    ctx.textAlign = 'right';
+    ctx.fillText('LOOP ' + (loopCount+1), canvas.width-4, STATUS_H/2);
+  }
+
+  function wrapText(text, maxChars){
+    var words = text.split(' ');
+    var lines = [], cur = '';
+    words.forEach(function(w){
+      if ((cur + ' ' + w).trim().length > maxChars){
+        lines.push(cur.trim()); cur = w;
+      } else cur = (cur + ' ' + w).trim();
+    });
+    if (cur) lines.push(cur);
+    return lines;
+  }
+
+  var DIALOGUE_LINE_H = 11;
+  var DIALOGUE_MIN_BH = 60;
+  var DIALOGUE_BOTTOM_MARGIN = 6;
+  var DIALOGUE_TOP_MARGIN = 4;
+
+  function dialogueBoxRect(lineCount){
+    var bx = 10, bw = 300;
+    var textBlockH = Math.max(lineCount, 1) * DIALOGUE_LINE_H;
+    var bh = 28 + textBlockH + 12; // header/speaker space + text + footer space
+    bh = Math.max(bh, DIALOGUE_MIN_BH);
+    var maxBh = 240 - STATUS_H - DIALOGUE_TOP_MARGIN - DIALOGUE_BOTTOM_MARGIN;
+    bh = Math.min(bh, maxBh);
+    var by = 240 - bh - DIALOGUE_BOTTOM_MARGIN;
+    by = Math.max(by, STATUS_H + DIALOGUE_TOP_MARGIN);
+    return { bx:bx, by:by, bw:bw, bh:bh };
+  }
+
+  function drawDialogueBox(){
+    if (!dialogue.active) return;
+    var step = currentStep();
+    if (!step) return;
+    var isSystem = step.type === 'line' && step.system;
+
+    var lineCount = 2;
+    var sysLines, lines;
+    if (step.type === 'choice'){
+      lineCount = step.options.length + 1;
+    } else if (isSystem){
+      sysLines = wrapText(step.text, 38);
+      lineCount = sysLines.length;
+    } else {
+      lines = wrapText(step.text, 34);
+      lineCount = lines.length + 1; // +1 for the speaker label row
+    }
+
+    var rect = dialogueBoxRect(lineCount);
+    var bx = rect.bx, by = rect.by, bw = rect.bw, bh = rect.bh;
+
+    ctx.fillStyle = '#0d1321';
+    ctx.fillRect(bx,by,bw,bh);
+    ctx.strokeStyle = isSystem ? '#ffd257' : '#f4ecd8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bx+1,by+1,bw-2,bh-2);
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    if (step.type === 'choice'){
+      ctx.fillStyle = '#5ee6c8';
+      ctx.fillText('CHOOSE:', bx+8, by+14);
+      step.options.forEach(function(opt, i){
+        var y = by+30+i*14;
+        var marker = (i === dialogue.selected) ? '> ' : '  ';
+        ctx.fillStyle = (i === dialogue.selected) ? '#ffd257' : '#f4ecd8';
+        ctx.fillText(marker + (i+1) + ') ' + opt.label, bx+8, y);
+      });
+      ctx.fillStyle = '#a9a3c9';
+      ctx.font = '6px "Press Start 2P", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText('1/2 OR ENTER', bx+bw-8, by+bh-6);
+      return;
+    }
+
+    if (isSystem){
+      ctx.fillStyle = '#ffd257';
+      ctx.textAlign = 'center';
+      sysLines.forEach(function(l,i){
+        ctx.fillText(l, bx+bw/2, by+18+i*DIALOGUE_LINE_H);
+      });
+    } else {
+      ctx.fillStyle = '#5ee6c8';
+      var speaker = step.who === 'you' ? 'YOU' : step.who.toUpperCase();
+      ctx.fillText(speaker, bx+8, by+14);
+      ctx.fillStyle = '#f4ecd8';
+      lines.forEach(function(l,i){
+        ctx.fillText(l, bx+8, by+28+i*DIALOGUE_LINE_H);
+      });
+    }
+    ctx.fillStyle = '#a9a3c9';
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('SPACE >', bx+bw-8, by+bh-6);
+  }
+
+  function drawTitle(t){
+    ctx.fillStyle = '#0d1321';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    for (var i=0;i<40;i++){
+      var sx = (i*53)%320, sy = (i*97 + (t*0.01))%240;
+      ctx.fillStyle = i%3===0 ? '#2a3559' : '#171b33';
+      ctx.fillRect(sx, sy%240, 2,2);
+    }
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ff5d73';
+    ctx.font = '14px "Press Start 2P", monospace';
+    ctx.fillText('JUST ONE MORE', 160, 84);
+    ctx.fillText('GOODBYE', 160, 104);
+    ctx.fillStyle = '#a9a3c9';
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.fillText('you can leave whenever you want.', 160, 130);
+
+    if (Math.floor(t/450)%2===0){
+      ctx.fillStyle = '#5ee6c8';
+      ctx.font = '9px "Press Start 2P", monospace';
+      ctx.fillText('PRESS START', 160, 176);
+    }
+    drawActor(5,7,'#7ec4ff','#3f8fd6','down',false,0,t);
+    drawActor(9,7,'#ff9e5e','#d5702c','down',true,1,t);
+    drawActor(7,8,'#a4e05a','#6fa930','down',true,2,t);
+  }
+
+  // ---------- audio (placeholder chiptune) ----------
+  var audioCtx = null, soundOn = false, seqTimer = null;
+  var notes = [261.6,329.6,392.0,329.6, 293.7,349.2,440.0,349.2];
+  var ni = 0;
+  function startMusic(){
+    if (!soundOn) return;
+    if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if (seqTimer) return;
+    seqTimer = setInterval(function(){
+      if (!soundOn || !audioCtx) return;
+      var freq = notes[ni % notes.length]; ni++;
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = freq;
+      gain.gain.value = 0.05;
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+    }, 220);
+  }
+  function stopMusic(){
+    if (seqTimer){ clearInterval(seqTimer); seqTimer = null; }
+  }
+  var soundBtn = document.getElementById('soundBtn');
+  soundBtn.addEventListener('click', function(){
+    soundOn = !soundOn;
+    soundBtn.textContent = 'SOUND: ' + (soundOn ? 'ON' : 'OFF');
+    if (soundOn) startMusic(); else stopMusic();
+  });
+
+  // ---------- main loop ----------
+  function frame(t){
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    if (state === STATE_TITLE){
+      drawTitle(t);
+    } else {
+      if (state === STATE_PLAY) updateGuestAI(t);
+      drawFloorAndWalls(t);
+      drawGuests(t);
+      drawPlayer(t);
+      drawStatusBar();
+      drawDialogueBox();
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
