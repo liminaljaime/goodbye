@@ -410,6 +410,8 @@
   var loopCount = 0;
   var goodbyesRemaining = 0;
   var lastFarewellName = null;  // who you most recently said a proper goodbye to
+  var tableBumpStreak = 0;      // consecutive attempts to walk into a table
+  var playerEasterEgg = null;   // {startT} while the beer animation plays
 
   function guestById(id){
     for (var i=0;i<guests.length;i++) if (guests[i].id === id) return guests[i];
@@ -746,6 +748,16 @@
     openScript(doorSteps(), null);
   }
 
+  // easter egg: walk into a table three times in a row and help yourself
+  function triggerBeerEasterEgg(){
+    playerEasterEgg = { startT: performance.now() };
+    var steps = [
+      {type:'line', who:'SYSTEM', text:"Mmmmm... delicious beer.", system:true},
+      {type:'line', who:'SYSTEM', text:"*hic*", system:true, end:true}
+    ];
+    openScript(steps, null);
+  }
+
   // ---------- ambient guest movement ----------
   function tileOccupied(gx, gy, excludeGuest){
     if (player.gx === gx && player.gy === gy) return true;
@@ -793,8 +805,21 @@
     player.facing = facing;
     var nx = player.gx+dx, ny = player.gy+dy;
 
-    if (isDoor(nx,ny)){ tryDoor(); return; }
-    if (solidAt(nx,ny)) return;
+    if (isDoor(nx,ny)){ tableBumpStreak = 0; tryDoor(); return; }
+
+    if (solidAt(nx,ny)){
+      if (FURNITURE_MAP[nx+','+ny] === 'T'){
+        tableBumpStreak++;
+        if (tableBumpStreak >= 3){
+          tableBumpStreak = 0;
+          triggerBeerEasterEgg();
+        }
+      } else {
+        tableBumpStreak = 0;
+      }
+      return;
+    }
+    tableBumpStreak = 0;
 
     var bump = null;
     for (var i=0;i<guests.length;i++){
@@ -924,11 +949,11 @@
     ctx.fillText('EXIT', 16*TILE+2, STATUS_H+4*TILE+6);
   }
 
-  function drawActor(gx,gy,bodyColor,shadeColor,facing,hat,bobPhase,t,dancing){
+  function drawActor(gx,gy,bodyColor,shadeColor,facing,hat,bobPhase,t,dancing,extraDy){
     var x = gx*TILE, y = STATUS_H + gy*TILE;
     var bobAmp = dancing ? 3 : 1;
     var bobSpeed = dancing ? 0.02 : 0.006;
-    var bob = Math.sin((t||0)*bobSpeed + (bobPhase||0)) * bobAmp;
+    var bob = Math.sin((t||0)*bobSpeed + (bobPhase||0)) * bobAmp + (extraDy||0);
     var sway = dancing ? Math.sin((t||0)*0.015 + (bobPhase||0)) * 2 : 0;
     var cx = x + TILE/2, cy = y + TILE/2;
     ctx.save();
@@ -963,9 +988,51 @@
     ctx.restore();
   }
 
+  // three table-bumps in a row: little jump, then a couple of hiccups
+  var EASTER_EGG_JUMP_MS = 380;
+  var EASTER_EGG_HIC_MS = 420;
+
+  function beerEggOffset(t){
+    if (!playerEasterEgg) return { dy:0, hic:false, showMug:false };
+    var elapsed = t - playerEasterEgg.startT;
+    if (elapsed > EASTER_EGG_JUMP_MS + EASTER_EGG_HIC_MS){
+      playerEasterEgg = null;
+      return { dy:0, hic:false, showMug:false };
+    }
+    if (elapsed < EASTER_EGG_JUMP_MS){
+      var p = elapsed / EASTER_EGG_JUMP_MS;
+      return { dy: -Math.sin(p * Math.PI) * 9, hic:false, showMug: elapsed < EASTER_EGG_JUMP_MS * 0.75 };
+    }
+    var p2 = (elapsed - EASTER_EGG_JUMP_MS) / EASTER_EGG_HIC_MS;
+    return { dy: -Math.abs(Math.sin(p2 * Math.PI * 2.5)) * 2.5, hic:true, showMug:false };
+  }
+
+  function drawBeerMug(gx, gy, dy){
+    var x = gx*TILE, y = STATUS_H + gy*TILE + dy;
+    var mx = x + TILE - 6, my = y - 1;
+    ctx.fillStyle = '#ffd257';
+    ctx.fillRect(mx, my, 5, 6);
+    ctx.fillStyle = '#f4ecd8';
+    ctx.fillRect(mx, my - 2, 5, 2);
+    ctx.strokeStyle = '#cf9f22';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(mx + 5, my + 1, 2, 3);
+  }
+
+  function drawHiccup(gx, gy, dy){
+    var x = gx*TILE + TILE/2, y = STATUS_H + gy*TILE - 8 + dy;
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#5ee6c8';
+    ctx.fillText('*hic*', x, y);
+  }
+
   function drawPlayer(t){
     var dancing = isDanceFloor(player.gx, player.gy);
-    drawActor(player.gx, player.gy, '#7ec4ff', '#3f8fd6', player.facing, false, 0, t, dancing);
+    var egg = beerEggOffset(t);
+    drawActor(player.gx, player.gy, '#7ec4ff', '#3f8fd6', player.facing, false, 0, t, dancing, egg.dy);
+    if (egg.showMug) drawBeerMug(player.gx, player.gy, egg.dy);
+    if (egg.hic) drawHiccup(player.gx, player.gy, egg.dy);
   }
 
   function drawGuests(t){
