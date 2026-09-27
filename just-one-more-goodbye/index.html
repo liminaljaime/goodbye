@@ -125,7 +125,7 @@
     <canvas id="game" width="320" height="240"></canvas>
   </div>
   <div class="controls-row">
-    <div class="hint">ARROWS / WASD MOVE<br>WALK INTO A GUEST TO TALK<br>SPACE ADVANCES &middot; 1/2 PICKS A REPLY</div>
+    <div class="hint">ARROWS / WASD MOVE<br>WALK INTO A GUEST TO TALK<br>SPACE ADVANCES</div>
     <button class="btn" id="soundBtn" type="button">SOUND: OFF</button>
   </div>
   <div class="footer">A PARTY YOU CANNOT LEAVE &middot; EST. TONIGHT</div>
@@ -208,180 +208,164 @@
   // A brand-new arrival guest is always played at "fresh" (they don't know
   // what's going on yet) via effectiveTier(); everyone else uses tier().
   var CHARACTERS = {
-    Elena: {
-      mechanic: "chill", gender: "f",
-      hintAsk: "Catch {next} on your way out.",
+    Sarah: {
+      gender: "f",
       lines: {
-        fresh: { theirs: "Yeah, sound. Night, mate.", hintGuestReact: "Yeah. Night." },
-        tier1: { theirs: "Round two. Sound. Night.", hintGuestReact: "Yeah. Weird, but sure." },
-        tier2: { theirs: "Third one now, is it. Sound.", hintGuestReact: "Yeah. It's weird. I know." },
-        tier3: { theirs: "Sound. This keeps happening.", hintGuestReact: "Yeah. It's weird. Not fussed though." },
-        tier4: { theirs: "Sound. Same as ever.", hintGuestReact: "Yeah. It's weird. We're all just doing it now." }
-      }
-    },
-    Yuki: {
-      mechanic: "chill", gender: "f",
-      hintAsk: "Oh -- um, and {next} too, if you get the chance.",
-      lines: {
-        fresh: { theirs: "Oh -- okay! Bye. This was really nice.", hintGuestReact: "Oh -- okay. Sorry, um, yes." },
-        tier1: { theirs: "Oh. Um. Bye again, then?", hintGuestReact: "Sorry -- was that a yes? I mean -- okay." },
-        tier2: { theirs: "Sorry -- is this the third time? I don't want to be rude and ask.", hintGuestReact: "Um. Sorry. I don't know if I should say something." },
-        tier3: { theirs: "Oh gosh. Um. Bye again. Sorry, I don't know what to say.", hintGuestReact: "Sorry -- I really don't know if you're annoyed at me or not." },
-        tier4: { theirs: "Oh. Bye. I've stopped trying to work out if this is new.", hintGuestReact: "Sorry. Um. I'll just say it every time, just in case." }
-      }
-    },
-    Mia: {
-      mechanic: "chill", gender: "f",
-      hintAsk: "Oh -- and {next}, apparently.",
-      lines: {
-        fresh: { theirs: "Oh my god, same. Teach me your ways.", hintGuestReact: "Oh -- fair enough. Good luck." },
-        tier1: { theirs: "You're really trying again? Respect.", hintGuestReact: "I believe you. Genuinely. Go." },
-        tier2: { theirs: "Third attempt? Same. I actually believe every word of this.", hintGuestReact: "I know. I know you have. I believe you completely." },
-        tier3: { theirs: "Four times. I've started keeping notes. On your side, for the record.", hintGuestReact: "I believe you. I've believed you since the second one." },
-        tier4: { theirs: "Honestly? At this point you're basically my proof.", hintGuestReact: "I know. I've always known. Go, before it gets you again." }
+        fresh: { reaction: "Oh! Already? Have you eaten?", closingHint: "Go on then. Oh -- and don't forget {next}." },
+        tier1: { reaction: "Again? Okay. Have you eaten this time?", closingHint: "Go on. And {next} too, don't forget." },
+        tier2: { reaction: "You look shattered. Sit -- no? Okay.", closingHint: "Go on, love. And {next}, obviously." },
+        tier3: { reaction: "Right. Okay. You've done this a lot tonight.", closingHint: "Go on then. {next}. Same as ever." },
+        tier4: { reaction: "Of course. Here we go again.", closingHint: "Go on. {next}. Always {next}." }
       }
     },
     Tom: {
-      mechanic: "oblivious", gender: "m",
-      hintAsk: "Oh, and catch {next} before you go, mate.",
+      gender: "m",
       lines: {
-        fresh: { q: "Wait, you're heading off? Already?", confuse2: "Nah, you're alright, go on then, legend.", whatBeat: "Eh?", close: "Ah, fair enough. So good seeing you, mate.", hintGuestReact: "Nice one. Go on." },
-        tier1: { q: "Hang on -- didn't we just do this?", confuse2: "Nah, must be someone else. Go on.", whatBeat: "Mate?", close: "Weird. Anyway -- love you, legend.", hintGuestReact: "Ha, yeah, whatever you say, mate." },
-        tier2: { q: "Mate. Mate, we've done this. I remember your face.", confuse2: "Nah, come off it, you're having a laugh.", whatBeat: "What?", close: "Forget it, doesn't matter -- love you, legend.", hintGuestReact: "Mate, you're winding me up." },
-        tier3: { q: "Tom. We are doing this again. I can feel it happening.", confuse2: "Nah, mate. Nah. You're definitely winding me up.", whatBeat: "MATE.", close: "Don't even care anymore -- love you, legend.", hintGuestReact: "Mate. You're actually winding me up now." },
-        tier4: { q: "Same as always, isn't it.", confuse2: "Yeah, yeah, classic us. Go on.", whatBeat: "Yeah?", close: "Love you, legend. See you in five.", hintGuestReact: "Mate, I've stopped believing you're being serious." }
+        fresh: { reaction: "Mate, no way, already?", closingHint: "Love you, legend. Oh, catch {next} before you go." },
+        tier1: { reaction: "Wait, didn't we just do this?", closingHint: "Love you, legend. And {next} too, yeah?" },
+        tier2: { reaction: "Mate, you're winding me up.", closingHint: "Whatever, love you. Catch {next} as well." },
+        tier3: { reaction: "We are DEFINITELY doing this again.", closingHint: "Love you, legend. {next}. Same as always." },
+        tier4: { reaction: "Course we are. Classic us.", closingHint: "Love you. {next}. Obviously." }
       }
     },
     Priya: {
-      mechanic: "oblivious", gender: "f",
-      hintAsk: "Oh! And {next} too -- say bye, yeah?",
+      gender: "f",
       lines: {
-        fresh: { q: "Oh my god, wait -- sorry, who are you again?", confuse2: "Oh my god, YES, of course, sorry!", whatBeat: "Sorry?", close: "Bye! This was so nice, whoever you are.", hintGuestReact: "Yes! Sorry, yes, go!" },
-        tier1: { q: "Wait -- sorry -- have we done this? You look familiar.", confuse2: "Oh no, have I forgotten already? I'm so sorry.", whatBeat: "Sorry, what?", close: "I'm so sorry, my brain is mush. Bye though!", hintGuestReact: "Oh god, sorry, yes, of course." },
-        tier2: { q: "Wait, I definitely know your face. Have we said bye already?", confuse2: "Oh my god, have I forgotten AGAIN? I'm the worst.", whatBeat: "Sorry, sorry, what?", close: "That is so weird. Bye! I'll remember your name eventually!", hintGuestReact: "Sorry, sorry -- yes, I promise, go." },
-        tier3: { q: "Okay, we've definitely done this. I don't know your name and that's on me.", confuse2: "I'm so sorry, I clearly keep forgetting, it's not you, it's me.", whatBeat: "Sorry -- what was that?", close: "This is the weirdest deja vu. Bye! I'm sorry, whoever you are!", hintGuestReact: "I'm sorry. I don't know why I keep doing this to you." },
-        tier4: { q: "I'm not even going to ask if we've met. Obviously we have.", confuse2: "Story of my night, honestly. Sorry.", whatBeat: "Sorry -- yes?", close: "Bye! Love you! I've made peace with not knowing your name.", hintGuestReact: "Sorry. Genuinely. I'll get it right eventually. Maybe." }
-      }
-    },
-    Nia: {
-      mechanic: "oblivious", gender: "f",
-      hintAsk: "Oh -- and {next}'s around somewhere, say bye.",
-      lines: {
-        fresh: { q: "Wait, wait, you HAVE to hear this transition.", confuse2: "Fine, fine -- go, text me when the next one drops.", whatBeat: "Huh?", close: "This set's insane, honestly. Bye.", hintGuestReact: "Yeah, sure, go on." },
-        tier1: { q: "Did I already play you this one? Doesn't matter, listen.", confuse2: "Yeah, still leaving, I heard you.", whatBeat: "Sorry, what?", close: "Mad. Okay bye, one more song though, actually --", hintGuestReact: "Yeah, whatever, sure." },
-        tier2: { q: "Wait, I've definitely played you this exact transition before.", confuse2: "You probably have said that, yeah. I wasn't really listening.", whatBeat: "Sorry -- what?", close: "Weird. Okay. Bye. Actually -- one more, hang on --", hintGuestReact: "I think it's the playlist, honestly." },
-        tier3: { q: "Okay this is definitely the same transition. Every time.", confuse2: "Yeah, I know, I know, I heard you the first four times.", whatBeat: "WHAT?", close: "Fine. Bye. The set's basically a loop too, now I think about it.", hintGuestReact: "It's the playlist. It has to be the playlist." },
-        tier4: { q: "I've stopped trying to remember what I've played you.", confuse2: "Story of my night. Just listen.", whatBeat: "What -- sorry?", close: "Bye! Actually, one more -- no. Bye. For real.", hintGuestReact: "Genuinely think it's the playlist at this point." }
-      }
-    },
-    Oscar: {
-      mechanic: "oblivious", gender: "m",
-      hintAsk: "Also {next}. Say bye to {next}.",
-      lines: {
-        fresh: { q: "WAIT. Are you leaving?", confuse2: "Yeah, mate, go on then.", whatBeat: "What?", close: "NO. Okay. Fine. Text me. Wait, do I have your number?", hintGuestReact: "Yeah! Go on! Wait, what were we -- go on." },
-        tier1: { q: "Wait -- have we done the leaving bit already?", confuse2: "Yeah, mate, same as before.", whatBeat: "Eh? What?", close: "Mental. Okay. Bye! Wait, are you the pizza guy?", hintGuestReact: "Yeah, sure -- who again? Doesn't matter, go." },
-        tier2: { q: "THIRD TIME. Wait, how do I know that? Something's off, mate.", confuse2: "Something's very off, mate, and I've lost my drink.", whatBeat: "Sorry, what were you -- what?", close: "Mad. Genuinely mad. Bye! Who ordered the pizza?", hintGuestReact: "Yeah, go -- hang on, who's leaving? You. Go." },
-        tier3: { q: "I keep having this exact conversation, mate. Is that normal?", confuse2: "Might be, mate, I dunno, I've forgotten half of what I said already.", whatBeat: "What -- sorry, what were we saying?", close: "That's mental. Okay bye! Wait -- did the pizza come?", hintGuestReact: "Go -- wait, who's -- yeah. Go. Definitely go." },
-        tier4: { q: "You know what, I'm not gonna ask, this just happens now.", confuse2: "Yeah. This is just tonight, apparently.", whatBeat: "Sorry -- what were we even doing?", close: "Mental. Love it though. Bye! Is the pizza guy stuck in this too?", hintGuestReact: "Yeah, go -- go where though? Go, mate. Just go." }
+        fresh: { reaction: "Oh my god, wait, who are you again?", closingHint: "Bye! Oh -- and say bye to {next} too!" },
+        tier1: { reaction: "Wait, have I said bye to you already?", closingHint: "Bye! And {next}, I think?" },
+        tier2: { reaction: "Oh my god, have we done this? I'm the worst.", closingHint: "Bye! {next} too, probably." },
+        tier3: { reaction: "I don't know your name and we've done this loads.", closingHint: "Bye! {next}. Again, probably." },
+        tier4: { reaction: "Story of my night, honestly.", closingHint: "Bye! {next}. Same as always." }
       }
     },
     Mike: {
-      mechanic: "chatty", gender: "m",
-      hintAsk: "Oh, catch {next} before you go, yeah?",
+      gender: "m",
       lines: {
-        fresh: { hook: "Yeah, yeah, go. Anyway, the thing with the van--", keepGoing: "Yeah, that's what I mean. Because the van--", whatBeat: "What?", circular: "Yeah. I'm telling you to leave.", cutSelf: "So anyway-- actually, no, go on, go. Love you, mate.", hintGuestReact: "Yeah, yeah. Go on then." },
-        tier1: { hook: "Yeah, go on -- wait, did I tell you the end of the van thing?", keepGoing: "No? Okay so basically--", whatBeat: "Hm? What?", circular: "Yeah, that's -- yeah. Go. I'm agreeing with you.", cutSelf: "Anyway-- no, you're right, go. Drive safe. Walk safe.", hintGuestReact: "Yeah, yeah. Sure. Anyway--" },
-        tier2: { hook: "Go on, mate -- have I told you this one tonight already?", keepGoing: "Doesn't matter, this bit's different, listen--", whatBeat: "What, mate?", circular: "Yeah, exactly, that's what I've been saying. Go.", cutSelf: "So anyway-- no. No, go. I mean it. Love you, mate.", hintGuestReact: "Yeah, yeah. Anyway--" },
-        tier3: { hook: "Go on -- has this story been getting longer each time, or is that me?", keepGoing: "Anyway, doesn't matter, which is mad because it wasn't even that long first time--", whatBeat: "WHAT, mate?", circular: "Yeah! That's what I'm saying! Go!", cutSelf: "So anyway-- go. Genuinely. I have to physically stop talking now.", hintGuestReact: "Yeah, yeah. Anyway--" },
-        tier4: { hook: "Go on -- don't even start me, I know how it ends anyway. Go on, go on.", keepGoing: "Actually, at this point the story might just BE the party, mate.", whatBeat: "Mm? What?", circular: "Yeah. Leaving. I know. Go.", cutSelf: "So anyway-- I'm leaving mid-story here too, honestly. Love you.", hintGuestReact: "Yeah, yeah. Anyway--" }
+        fresh: { reaction: "Oh -- yeah, go on. Anyway, the van--", closingHint: "Love you, mate. Catch {next} before you go." },
+        tier1: { reaction: "Go on -- wait, did I tell you the van thing?", closingHint: "Love you, mate. And {next}, yeah?" },
+        tier2: { reaction: "Go on, mate -- have I told you this one already?", closingHint: "Love you. {next} too, mate." },
+        tier3: { reaction: "Go on -- this story keeps getting longer, doesn't it.", closingHint: "Love you, mate. {next}. Same as always." },
+        tier4: { reaction: "Go on, go on. I know how it ends anyway.", closingHint: "Love you. {next}. Obviously." }
       }
     },
-    Carlos: {
-      mechanic: "chatty", gender: "m",
-      hintAsk: "And {next} -- say bye to {pron_obj} too.",
+    Elena: {
+      gender: "f",
       lines: {
-        fresh: { hook: "No but listen, before you go, this is important--", keepGoing: "-- and that's exactly what they don't want you thinking about.", whatBeat: "What.", circular: "Yeah, exactly -- that's the point. You're leaving. Good.", cutSelf: "Anyway-- stay safe out there, yeah? Love you.", hintGuestReact: "Yeah. Go. Think about it." },
-        tier1: { hook: "Wait, go on -- have I told you this theory already? It's evolved.", keepGoing: "-- which, if you think about it, explains tonight too.", whatBeat: "What?", circular: "Right -- exactly. You're proving my point right now.", cutSelf: "Anyway-- think about it. Seriously. Bye.", hintGuestReact: "See, that. That's exactly it." },
-        tier2: { hook: "Wait -- THREE goodbyes. Doesn't that seem odd to you? Listen--", keepGoing: "-- because I've said this party feels off all night, and now THIS.", whatBeat: "What, what?", circular: "Exactly! You feel it too! This is what I've been saying!", cutSelf: "Anyway-- be careful tonight, I mean that. Bye.", hintGuestReact: "THANK YOU. Finally. Someone else sees it." },
-        tier3: { hook: "See, THIS is what I mean. Four goodbyes. That's a structure--", keepGoing: "-- and once you see the structure, mate, you can't unsee it.", whatBeat: "WHAT.", circular: "You're living proof. Right now. This exact moment.", cutSelf: "Anyway-- stay sharp. I mean that more than usual now.", hintGuestReact: "I've been saying this all night. You're the proof." },
-        tier4: { hook: "You get it now, right? You have to get it now--", keepGoing: "-- this isn't a party anymore, mate, this is a system.", whatBeat: "What.", circular: "Exactly. We're both inside it. Right now. Still.", cutSelf: "Anyway-- see you in the next one, probably. Love you.", hintGuestReact: "Told you. I've been telling everyone." }
-      }
-    },
-    Ben: {
-      mechanic: "chatty", gender: "m",
-      hintAsk: "Oh, and catch {next} before you go.",
-      lines: {
-        fresh: { hook: "Wait, no, you cannot leave before my song--", keepGoing: "-- it's literally cued up, I've been waiting all night for this key change.", whatBeat: "What?", circular: "Yeah -- exactly, you're leaving before my song. That's what I said.", cutSelf: "Anyway-- love you, mate, I'm gonna head off now though -- wait, no, that's you.", hintGuestReact: "You're just trying to dodge the key change, aren't you." },
-        tier1: { hook: "You said that last time too, right before my song--", keepGoing: "-- and you missed the key change AGAIN, mate, it's tragic.", whatBeat: "Mate, what?", circular: "Yeah, leaving, before my song, again. I know the drill.", cutSelf: "Anyway-- I promise I'll catch the next key change some other loop.", hintGuestReact: "You're timing this to dodge my song, aren't you." },
-        tier2: { hook: "Third time missing my key change. THIRD. Do you know how that feels--", keepGoing: "-- I've been building to this note ALL NIGHT and you keep walking out.", whatBeat: "WHAT, mate?", circular: "Yeah, leaving, before the note, I've heard this bit.", cutSelf: "Anyway-- I am so sorry about the note. I'll catch it next time.", hintGuestReact: "This is definitely about dodging my song, isn't it." },
-        tier3: { hook: "Fourth time. I'm starting to think you're doing this on purpose--", keepGoing: "-- there is NO WAY you keep missing this note by accident, mate.", whatBeat: "WHAT.", circular: "Leaving. Before the note. Every single time. Noted.", cutSelf: "Anyway-- one of these times I will hear the whole song, I promise.", hintGuestReact: "You are absolutely doing this to dodge my key change." },
-        tier4: { hook: "You know what, at this point I don't even think the song ends--", keepGoing: "-- we're just permanently one note away from the big moment, forever.", whatBeat: "What?", circular: "Yeah. Leaving. Before the note. As ever.", cutSelf: "Anyway-- see you at the key change. Again. Eventually.", hintGuestReact: "Story of my night. You and that note." }
-      }
-    },
-    Theo: {
-      mechanic: "chatty", gender: "m",
-      hintAsk: "Oh, and find {next} before you go.",
-      lines: {
-        fresh: { hook: "Wait, have you tried this? Just -- just wait, one second--", keepGoing: "-- okay it's not quite ready but you have to taste the sauce at least.", whatBeat: "What?", circular: "Yeah -- go, but taste this first, that's all I'm saying.", cutSelf: "Anyway-- love you, I'll save you some for next time, I promise.", hintGuestReact: "Take some with you at least." },
-        tier1: { hook: "Did you try it last time? Doesn't matter, taste it again--", keepGoing: "-- I tweaked the garlic, it's better now, I promise.", whatBeat: "Sorry, what?", circular: "Yeah, go, but taste it first, same as before.", cutSelf: "Anyway-- genuinely, I'll save you a plate. I've got to let you go.", hintGuestReact: "Take some for the road, honestly, it's good." },
-        tier2: { hook: "Third goodbye and it's STILL not ready, which tracks -- taste this bit--", keepGoing: "-- because I've added more garlic since the last two times.", whatBeat: "What, sorry?", circular: "Leaving, yeah, taste it first though, every time.", cutSelf: "Anyway-- it's going to be ready right as the party ends, isn't it.", hintGuestReact: "You should take a plate. You always leave hungry." },
-        tier3: { hook: "Four times and I genuinely think it's slightly more done each time--", keepGoing: "-- it's ALMOST there. Been almost there for hours. Taste it.", whatBeat: "WHAT?", circular: "Leaving. Taste it first. We both know how this goes.", cutSelf: "Anyway-- I think this bread might outlive the party.", hintGuestReact: "You never take a plate. Take a plate this time." },
-        tier4: { hook: "You know what, at this point I don't think it's ABOUT being ready--", keepGoing: "-- I think we're just going to be here, tasting sauce, forever.", whatBeat: "What?", circular: "Leaving. Taste it. Same as every time.", cutSelf: "Anyway-- save me a plate for whichever loop this bread finishes in.", hintGuestReact: "Take the bread. Just take the bread this time." }
-      }
-    },
-    Wendy: {
-      mechanic: "sentimental", gender: "f",
-      hintAsk: "Oh -- and please say bye to {next} too.",
-      lines: {
-        fresh: { hook: "Wait -- no -- come here, come here.", mid: "I just love you SO much, this has been the best night.", whatBeat: "Hm?", last: "Never change, okay? Never change!", hintGuestReact: "Okay! Go! Love you!" },
-        tier1: { hook: "Come here one more time though.", mid: "I know, I know -- I don't know why I'm crying again.", whatBeat: "Sorry, what?", last: "This keeps happening, but I mean it every time!", hintGuestReact: "Okay. Love you. Bless them, honestly." },
-        tier2: { hook: "Wait, is this -- have we done this? Doesn't matter, come here.", mid: "This is genuinely strange, but mostly I just love you.", whatBeat: "What -- are you okay?", last: "I don't understand what's happening but I love all of you!", hintGuestReact: "Are you actually upset? Come here." },
-        tier3: { hook: "Come here. I don't care if this is the fourth time.", mid: "Something is wrong here, and also I love you so much.", whatBeat: "Wait -- are you actually upset?", last: "I am slightly concerned, but mostly I love you!", hintGuestReact: "Come here. You look shattered. Sit down a second." },
-        tier4: { hook: "Come here. Every single time, I mean it just as much.", mid: "I don't understand this evening anymore but I love every version of it.", whatBeat: "Are you alright, though? Really?", last: "I love you. I don't need to understand it to love it!", hintGuestReact: "Come here. It's okay. I've got you. Whatever this is." }
-      }
-    },
-    Lena: {
-      mechanic: "sentimental", gender: "f",
-      hintAsk: "Oh -- and {next}!! Don't skip {pron_obj}.",
-      lines: {
-        fresh: { hook: "NO. Don't. It's just getting GOOD.", mid: "One more drink and then you can leave, I promise.", whatBeat: "WHAT.", last: "Fine! Go, ruin the best night of my LIFE -- okay I care, bye, love you!", hintGuestReact: "See! This is what I mean, it's SO good tonight!" },
-        tier1: { hook: "It's STILL just getting good, somehow.", mid: "One more dance and then you can leave, I mean it.", whatBeat: "Sorry, what?", last: "This keeps being the best night of my life, love you, bye!", hintGuestReact: "You're getting so INTO it tonight, I love that for you." },
-        tier2: { hook: "Wait -- THIRD time? Okay that's -- no, it's STILL just getting good!", mid: "One more drink, I mean it this time, probably.", whatBeat: "What's wrong -- oh my god, are you having the best night too?", last: "I don't understand what's happening but it's the best night, love you!", hintGuestReact: "You're SO into this tonight. I love it. I love YOU." },
-        tier3: { hook: "Four times?! That is genuinely wild, and I danced on the table earlier.", mid: "One more, I promise, this is clearly a whole THING now.", whatBeat: "Are you -- wait, is this the best night of YOUR life too?", last: "This might be the best night of my entire LIFE, on a loop, love you!", hintGuestReact: "You're being SO intense right now, I am obsessed with it." },
-        tier4: { hook: "At this point I'm just going to assume it's always just getting good.", mid: "One more, obviously, it's basically tradition now.", whatBeat: "This is definitely the best night either of us has ever had, right?", last: "Best night of my life, on repeat, and I am HERE for it, love you!", hintGuestReact: "I've never seen you this into a party. I love it." }
-      }
-    },
-    Sarah: {
-      mechanic: "clingy", gender: "f",
-      hintAsk: "Oh -- and don't forget {next} before you go.",
-      lines: {
-        fresh: { hook: "Oh -- wait, sit down a sec.", ask: "Have you eaten? Let me just -- do you want to take food with you?", declineNowClose: "Oh -- okay, fair enough! Text me when you're home.", stallLine: "Knew it. Right. Let me just sort you a plate.", acceptClose: "Okay, honestly, fine -- go, before I find you a doggy bag.", giveInClose: "One doggy bag. That's it. Then you're free. Probably.", hintGuestReact: "Go on then. Text me when you're home." },
-        tier1: { hook: "Wait -- sit down, just for a sec.", ask: "Did you eat this time? Let me just check -- take some food?", declineNowClose: "Okay, fine, go -- text me properly this time, though.", stallLine: "Knew it. Let me just sort you a plate, one sec.", acceptClose: "Fine. Go. I feel like we've done this bit, but fine.", giveInClose: "Just -- take the crisps. Please. Least I can do.", hintGuestReact: "Go on then. You look a bit tired, love." },
-        tier2: { hook: "Okay we have done this. Sit. Down.", ask: "Have I fed you already tonight? I can't remember. Let me check.", declineNowClose: "Fine, go -- I'm putting food in your hand on the way past.", stallLine: "Right. Plate. Now. I don't trust myself to remember.", acceptClose: "Go, honestly, before I make you a second plate.", giveInClose: "Take the crisps. And the sausage things. Not leaving hungry.", hintGuestReact: "Okay, okay. Sit down. You look shattered." },
-        tier3: { hook: "This is -- what, the fourth time? Sit down.", ask: "Fourth plate of the night, is it? I don't care if you've eaten.", declineNowClose: "Go. I mean it. Actually I don't know if I mean it.", stallLine: "There. Now go. Well -- after this.", acceptClose: "Go, go, go -- see you again in about ten minutes apparently.", giveInClose: "Fine. Crisps. Always crisps. It's a whole thing now.", hintGuestReact: "Okay. Sit. Down. You look absolutely done in." },
-        tier4: { hook: "Hi. Me again. Sit.", ask: "Not even going to ask if you've eaten. Here. Take this.", declineNowClose: "Go. Text me. Or don't, I'll see you in five minutes anyway.", stallLine: "There we go. Efficient, this time.", acceptClose: "Go on then. This is genuinely my favourite part of the night now.", giveInClose: "Take it. I keep a plate ready now. This is just how it works.", hintGuestReact: "Sit down, love. Have a biscuit. You've earned it." }
+        fresh: { reaction: "Yeah, sound.", closingHint: "Night, mate. Catch {next} on your way out." },
+        tier1: { reaction: "Round two. Sound.", closingHint: "Night. And {next}." },
+        tier2: { reaction: "Third one, is it. Sound.", closingHint: "Night. {next}, obviously." },
+        tier3: { reaction: "Sound. This keeps happening.", closingHint: "Night. {next}. Same as ever." },
+        tier4: { reaction: "Sound. Same as ever.", closingHint: "Night. {next}. Always." }
       }
     },
     Dave: {
-      mechanic: "clingy", gender: "m",
-      hintAsk: "And {next}, mate -- can't skip {pron_obj}.",
+      gender: "m",
       lines: {
-        fresh: { hook: "Mate. Mate, no. Sit down a sec.", ask: "One more, come on, good man.", declineNowClose: "Fair enough, mate. Straight out, no messing about.", stallLine: "Knew it. That's the spirit. *pours one*", acceptClose: "Alright, alright. Go on then, matey. Get home safe.", giveInClose: "Alright, alright -- ONE more, then you're out, deal?", hintGuestReact: "Go on then, good man." },
-        tier1: { hook: "Mate. Come here a sec.", ask: "You always say that. One more, come on.", declineNowClose: "Fair enough. No arguments this time, mate.", stallLine: "Knew it! Every time, mate, every time.", acceptClose: "Fine. Fair enough. Off you pop, matey.", giveInClose: "One more. I mean it. Well -- meant it last time too.", hintGuestReact: "You're getting worked up. One more?" },
-        tier2: { hook: "This is the third one of these, mate.", ask: "Third one, is it? Good stats. One more though.", declineNowClose: "Respect. Sober exits, that's the dream, mate.", stallLine: "Every single time. It's basically a ritual now.", acceptClose: "Go on. I'll get the next one ready for round four.", giveInClose: "One more. Basically part of the process now.", hintGuestReact: "You're getting worked up, mate. One more'll sort it." },
-        tier3: { hook: "This is number four, mate.", ask: "Four?! Legend. One more for the road though.", declineNowClose: "Fair enough. Four sober exits. Impressive, honestly.", stallLine: "Course you did. It's tradition now, mate.", acceptClose: "Go on then, mate. See you in five, knowing you.", giveInClose: "One more. Not even a question anymore, is it.", hintGuestReact: "You're properly worked up now, mate. One more, go on." },
-        tier4: { hook: "Lost count of which one this is, mate.", ask: "Lost count?! Respect. One more anyway, for the record.", declineNowClose: "Fair play. Go on then, matey, get out while you can.", stallLine: "Obviously. Basically muscle memory now, mate.", acceptClose: "Go on. See you in a bit, same as always.", giveInClose: "One more. This is just what we do now, isn't it.", hintGuestReact: "You're always worked up by this bit, mate. One more." }
+        fresh: { reaction: "Mate, no! One more?", closingHint: "Alright, go on. And {next}, mate -- can't skip {pron_obj}." },
+        tier1: { reaction: "You always say that. One more?", closingHint: "Fine, go on. {next} too, mate." },
+        tier2: { reaction: "Third one of these, mate.", closingHint: "Go on then. {next}, obviously." },
+        tier3: { reaction: "Number four, mate. Legend.", closingHint: "Go on. {next}. Same as ever." },
+        tier4: { reaction: "Lost count, mate. Respect.", closingHint: "Go on. {next}. Always." }
+      }
+    },
+    Wendy: {
+      gender: "f",
+      lines: {
+        fresh: { reaction: "Wait -- come here, come here!", closingHint: "Love you SO much! Oh -- say bye to {next} too!" },
+        tier1: { reaction: "Come here one more time!", closingHint: "Love you! And {next}, please!" },
+        tier2: { reaction: "Wait, have we done this? Come here anyway!", closingHint: "Love you all! {next} too!" },
+        tier3: { reaction: "This keeps happening! Come here!", closingHint: "Love you! {next}. Same as always!" },
+        tier4: { reaction: "Every time! Come here!", closingHint: "Love you! {next}. Always!" }
+      }
+    },
+    Nia: {
+      gender: "f",
+      lines: {
+        fresh: { reaction: "Wait, you HAVE to hear this!", closingHint: "Fine, go. {next}'s around somewhere, say bye." },
+        tier1: { reaction: "Did I play you this one already?", closingHint: "Bye. {next} too." },
+        tier2: { reaction: "I've definitely played you this before.", closingHint: "Bye. {next}, obviously." },
+        tier3: { reaction: "Same transition. Every time.", closingHint: "Bye. {next}. Same as ever." },
+        tier4: { reaction: "Stopped keeping track, honestly.", closingHint: "Bye. {next}. Always." }
+      }
+    },
+    Carlos: {
+      gender: "m",
+      lines: {
+        fresh: { reaction: "No but listen, this is important--", closingHint: "Stay safe out there. And {next} -- say bye to {pron_obj} too." },
+        tier1: { reaction: "Have I told you this theory already?", closingHint: "Think about it. {next} too." },
+        tier2: { reaction: "THREE goodbyes. That's not nothing.", closingHint: "Be careful. {next}, obviously." },
+        tier3: { reaction: "Four goodbyes. That's a structure.", closingHint: "Stay sharp. {next}. Same as ever." },
+        tier4: { reaction: "You get it now, right? You have to get it.", closingHint: "See you in the next one. {next}. Always." }
       }
     },
     Farah: {
-      mechanic: "clingy", gender: "f",
-      hintAsk: "And {next}, apparently.",
+      gender: "f",
       lines: {
-        fresh: { hook: "You're leaving? Lucky you.", ask: "Genuinely. Five more minutes, though?", declineNowClose: "Fair enough. Wise, honestly. Go on then.", stallLine: "Knew you'd cave. Sit back down.", acceptClose: "Go on then. Text me when you're home.", giveInClose: "Five minutes. Then go. Unlike everyone else here, I mean it.", hintGuestReact: "Go on then. Good luck." },
-        tier1: { hook: "You said that already. Lucky you, still.", ask: "Five minutes?", declineNowClose: "Fair enough. Smarter than the rest of us, honestly.", stallLine: "Knew it. Don't blame you for staying, honestly.", acceptClose: "Go. Please. Send a text. Take me with you, mentally.", giveInClose: "Fine. Five minutes. I'll time it. Nothing else to do.", hintGuestReact: "Yeah. I've noticed." },
-        tier2: { hook: "Third time saying this. I don't love what that says about me.", ask: "Third. Keeping count now, for what it's worth. Five minutes?", declineNowClose: "There it is. Genuinely proud of you for that one.", stallLine: "Called it. Remarkably little willpower, you know.", acceptClose: "Go. I'll be here. Always here, apparently, watching this.", giveInClose: "Five minutes. On the record, this is your choice, not mine.", hintGuestReact: "Yeah. I've noticed. I notice most things." },
-        tier3: { hook: "This is the fourth one of these. I really mean that more than usual.", ask: "Four. That's not a party anymore, that's a pattern. Five minutes?", declineNowClose: "There it is. Took you four tries, but there it is.", stallLine: "Predictable. Comfortingly so, at this point.", acceptClose: "Go on. Respect the persistence, even if the results don't.", giveInClose: "Five minutes. Not even surprised anymore. Sit.", hintGuestReact: "Yeah. Noticed a while ago, actually." },
-        tier4: { hook: "I've lost count, and honestly, so have you.", ask: "Stopped counting. Five minutes, out of habit more than hope.", declineNowClose: "There it is. Eventually. Well done, I suppose.", stallLine: "Naturally. This is basically our whole relationship now.", acceptClose: "Go. Text me. Or don't -- see you in five, statistically.", giveInClose: "Five minutes. Less a request now, more a law of physics.", hintGuestReact: "Yeah. Noticed hours ago. Go on." }
+        fresh: { reaction: "Leaving? Lucky you.", closingHint: "Text me when you're home. And {next}, apparently." },
+        tier1: { reaction: "You said that already. Lucky you, still.", closingHint: "Go on then. {next} too." },
+        tier2: { reaction: "Third time. I'm keeping count.", closingHint: "Go on. {next}, obviously." },
+        tier3: { reaction: "Fourth time. That's a pattern now.", closingHint: "Go on. {next}. Same as ever." },
+        tier4: { reaction: "Lost count. So have you.", closingHint: "Go on. {next}. Always." }
+      }
+    },
+    Ben: {
+      gender: "m",
+      lines: {
+        fresh: { reaction: "Wait, you can't leave before my song!", closingHint: "Love you, mate. Catch {next} before you go." },
+        tier1: { reaction: "You said that last time, before my song too.", closingHint: "Love you. {next} too." },
+        tier2: { reaction: "Third time missing my key change!", closingHint: "Love you. {next}, obviously." },
+        tier3: { reaction: "Fourth time! You're doing this on purpose!", closingHint: "Love you. {next}. Same as ever." },
+        tier4: { reaction: "One note away, forever, apparently.", closingHint: "Love you. {next}. Always." }
+      }
+    },
+    Yuki: {
+      gender: "f",
+      lines: {
+        fresh: { reaction: "Oh -- um, okay! Bye!", closingHint: "This was really nice. Um, {next} too, if you get the chance." },
+        tier1: { reaction: "Oh. Um. Bye again?", closingHint: "Still nice though. {next}, I think." },
+        tier2: { reaction: "Sorry -- is this the third time?", closingHint: "Um. {next}, probably." },
+        tier3: { reaction: "Oh gosh. Um. Bye again.", closingHint: "Sorry. {next}. Same as before." },
+        tier4: { reaction: "Oh. Bye. I've stopped keeping track.", closingHint: "Um. {next}. Always, I think." }
+      }
+    },
+    Oscar: {
+      gender: "m",
+      lines: {
+        fresh: { reaction: "WAIT. Are you leaving?", closingHint: "Fine! Text me. Also {next} -- say bye to {next}." },
+        tier1: { reaction: "Wait -- have we done this already?", closingHint: "Mental. {next} too." },
+        tier2: { reaction: "THIRD TIME. Something's off, mate.", closingHint: "Mad. {next}, obviously." },
+        tier3: { reaction: "I keep having this conversation, mate.", closingHint: "Mental. {next}. Same as always." },
+        tier4: { reaction: "This just happens now, apparently.", closingHint: "Love it though. {next}. Always." }
+      }
+    },
+    Lena: {
+      gender: "f",
+      lines: {
+        fresh: { reaction: "NO. Don't. It's just getting GOOD!", closingHint: "Fine, go! Love you! Oh -- and {next}!!" },
+        tier1: { reaction: "It's STILL just getting good, somehow!", closingHint: "Love you! {next} too!" },
+        tier2: { reaction: "THIRD time? It's still SO good though!", closingHint: "Love you! {next}, obviously!" },
+        tier3: { reaction: "Four times?! Wildest night ever!", closingHint: "Love you! {next}. Same as ever!" },
+        tier4: { reaction: "Always just getting good, apparently!", closingHint: "Love you! {next}. Always!" }
+      }
+    },
+    Theo: {
+      gender: "m",
+      lines: {
+        fresh: { reaction: "Wait, have you tried this?!", closingHint: "Love you. Find {next} before you go." },
+        tier1: { reaction: "Did you try it last time? Taste it again!", closingHint: "Love you. {next} too." },
+        tier2: { reaction: "Third goodbye and it's STILL not ready!", closingHint: "Love you. {next}, obviously." },
+        tier3: { reaction: "It's ALMOST ready. Been almost ready for hours.", closingHint: "Love you. {next}. Same as ever." },
+        tier4: { reaction: "We're just tasting sauce forever now, aren't we.", closingHint: "Love you. {next}. Always." }
+      }
+    },
+    Mia: {
+      gender: "f",
+      lines: {
+        fresh: { reaction: "Oh my god, same! Teach me your ways!", closingHint: "Good luck out there. {next}, apparently." },
+        tier1: { reaction: "You're really trying again? Respect.", closingHint: "Go. {next} too." },
+        tier2: { reaction: "Third attempt? Same. I believe you.", closingHint: "Go. {next}, obviously." },
+        tier3: { reaction: "Four times. I believe every word.", closingHint: "Go. {next}. Same as ever." },
+        tier4: { reaction: "You're basically my proof at this point.", closingHint: "Go. {next}. Always." }
       }
     }
   };
@@ -505,185 +489,28 @@
   // across every guest -- polite and a bit distracted at first, then
   // increasingly direct, suspicious, and finally just flatly exhausted.
   var OPENER = [
-    "Hey {name}, I think I'm gonna head off.",
-    "{name}, I'm off again.",
-    "{name}. I need to go. Again.",
-    "{name}. I've done this. I'm leaving.",
+    "Hey {name}, I'm just coming to say goodbye.",
+    "{name}, coming to say bye again.",
+    "{name}. Saying goodbye. Again.",
+    "{name}. Same as before -- bye.",
     "{name}. I really must go."
   ];
-  var PUSH = [
-    "No, honestly, I do have to go.",
-    "No, I mean it this time.",
-    "I know. I'm still leaving, though.",
-    "I'm not doing the whole thing again.",
-    "Yeah. Still leaving."
-  ];
-  var CLARIFY = [
-    "It's me! Just heading home, that's all.",
-    "Yeah -- it's me. Still heading home.",
-    "Same as before. I'm leaving.",
-    "You know who I am. I'm leaving.",
-    "Still me. Still leaving."
-  ];
-  var LEAVING = [
-    "I'm leaving.",
-    "I'm leaving. Properly, this time.",
-    "I'm leaving. Same as before.",
-    "I'm leaving. You know this.",
-    "Leaving."
-  ];
-  var GIVE_UP = ["...Okay.", "Sure.", "Right.", "Whatever you say.", "Fine."];
-  var HINT_REACT = [
-    "Yeah, okay.",
-    "I've already said goodbye to {next}, though.",
-    "I have said goodbye to {next} three times now.",
-    "{next}. I KNOW about {next}.",
-    "{next}. Right. {next}."
-  ];
+  var CLOSE = ["Okay, bye!", "Okay, bye.", "Right, bye.", "Bye.", "Yep. Bye."];
 
-  // from loop 2 onward, a guest's hint sometimes gets this uncanny little
-  // stumble instead of the usual reaction -- planted here rather than in
-  // any one character's voice, since it isn't really about them
-  function hintTail(guest, nextName, nextGender, t, hintGuestReactText){
-    if (t === 0 && guest.name !== 'Carlos' && guest.name !== 'Mia' && Math.random() < 0.3){
-      return [
-        {type:'line', who:'you', text:"Wait -- have I already said bye to " + nextName + "?"},
-        {type:'line', who:guest.name, text:"Have you?"},
-        {type:'line', who:'you', text:"...No. Never mind."},
-        {type:'line', who:guest.name, text:"Right. Well -- say bye anyway.", end:true}
-      ];
-    }
-    return [
-      {type:'line', who:'you', text: sub(HINT_REACT[t], guest, nextName, nextGender)},
-      {type:'line', who:guest.name, text: hintGuestReactText, end:true}
-    ];
-  }
-
-  function appendHint(steps, guest, nextName, nextGender, t, hintAskTemplate, hintGuestReactText){
-    if (!nextName || !hintAskTemplate){
-      steps[steps.length - 1].end = true;
-      return steps;
-    }
-    steps.push({type:'line', who:guest.name, text: sub(hintAskTemplate, guest, nextName, nextGender)});
-    return steps.concat(hintTail(guest, nextName, nextGender, t, hintGuestReactText));
-  }
-
-  // clingy needs a fixed-length hint tail so the choice-branch indices below
-  // stay correct regardless of randomness
-  function hintBeatFixed(guest, nextName, nextGender, t, hintAskTemplate, hintGuestReactText){
-    if (!nextName || !hintAskTemplate){
-      return [{type:'line', who:guest.name, text:"Anyway -- night!", end:true}];
-    }
-    return [
-      {type:'line', who:guest.name, text: sub(hintAskTemplate, guest, nextName, nextGender)},
-      {type:'line', who:'you', text: sub(HINT_REACT[t], guest, nextName, nextGender)},
-      {type:'line', who:guest.name, text: hintGuestReactText, end:true}
-    ];
-  }
-
-  function assembleChill(guest, ch, L, nextName, nextGender, t){
-    var steps = [
-      {type:'line', who:'you', text: sub(OPENER[t], guest, nextName, nextGender)},
-      {type:'line', who:guest.name, text: L.theirs}
-    ];
-    return appendHint(steps, guest, nextName, nextGender, t, ch.hintAsk, L.hintGuestReact);
-  }
-
-  function assembleOblivious(guest, ch, L, nextName, nextGender, t){
-    // no name/what/leaving beat here -- that repeat belongs to Mike's
-    // story-that-won't-end joke, not to every mechanic in the game
-    var steps = [
-      {type:'line', who:'you', text: sub(OPENER[t], guest, nextName, nextGender)},
-      {type:'line', who:guest.name, text: L.q},
-      {type:'line', who:'you', text: sub(PUSH[t], guest, nextName, nextGender)},
-      {type:'line', who:guest.name, text: L.confuse2},
-      {type:'line', who:guest.name, text: L.close}
-    ];
-    return appendHint(steps, guest, nextName, nextGender, t, ch.hintAsk, L.hintGuestReact);
-  }
-
-  function assembleChatty(guest, ch, L, nextName, nextGender, t){
-    var steps = [
-      {type:'line', who:'you', text: sub(OPENER[t], guest, nextName, nextGender)},
-      {type:'line', who:guest.name, text: L.hook},
-      {type:'line', who:'you', text: sub(PUSH[t], guest, nextName, nextGender)},
-      {type:'line', who:guest.name, text: L.keepGoing},
-      {type:'line', who:'you', text: guest.name + "."},
-      {type:'line', who:guest.name, text: L.whatBeat},
-      {type:'line', who:'you', text: sub(LEAVING[t], guest, nextName, nextGender)},
-      {type:'line', who:guest.name, text: L.circular},
-      {type:'line', who:'you', text: GIVE_UP[t]},
-      {type:'line', who:guest.name, text: L.cutSelf}
-    ];
-    return appendHint(steps, guest, nextName, nextGender, t, ch.hintAsk, L.hintGuestReact);
-  }
-
-  function assembleSentimental(guest, ch, L, nextName, nextGender, t){
-    // same reasoning as oblivious -- drop the name/what/leaving beat so this
-    // doesn't read like the same exchange as every other conversation
-    var steps = [
-      {type:'line', who:'you', text: sub(OPENER[t], guest, nextName, nextGender)},
-      {type:'line', who:guest.name, text: L.hook},
-      {type:'line', who:'you', text: sub(PUSH[t], guest, nextName, nextGender)},
-      {type:'line', who:guest.name, text: L.mid},
-      {type:'line', who:guest.name, text: L.last}
-    ];
-    return appendHint(steps, guest, nextName, nextGender, t, ch.hintAsk, L.hintGuestReact);
-  }
-
-  function assembleClingy(guest, ch, L, nextName, nextGender, t){
-    var steps = [];
-    steps.push({type:'line', who:'you', text: sub(OPENER[t], guest, nextName, nextGender)});
-    steps.push({type:'line', who:guest.name, text: L.hook});
-    steps.push({type:'line', who:'you', text: sub(PUSH[t], guest, nextName, nextGender)});
-    steps.push({type:'line', who:guest.name, text: L.ask});
-
-    var choice1Index = steps.length;
-    steps.push(null);
-
-    var declineIndex = steps.length;
-    steps.push({type:'line', who:guest.name, text: L.declineNowClose});
-    steps = steps.concat(hintBeatFixed(guest, nextName, nextGender, t, ch.hintAsk, L.hintGuestReact));
-
-    var stallIndex = steps.length;
-    steps.push({type:'line', who:guest.name, text: L.stallLine});
-
-    var choice2Index = steps.length;
-    steps.push(null);
-
-    var acceptIndex = steps.length;
-    steps.push({type:'line', who:guest.name, text: L.acceptClose});
-    steps = steps.concat(hintBeatFixed(guest, nextName, nextGender, t, ch.hintAsk, L.hintGuestReact));
-
-    var giveInIndex = steps.length;
-    steps.push({type:'line', who:guest.name, text: L.giveInClose});
-    steps = steps.concat(hintBeatFixed(guest, nextName, nextGender, t, ch.hintAsk, L.hintGuestReact));
-
-    steps[choice1Index] = {type:'choice', options:[
-      {label:"Okay, five more minutes", next: stallIndex},
-      {label:"No, I really have to go", next: declineIndex}
-    ]};
-    steps[choice2Index] = {type:'choice', options:[
-      {label:"Okay, I really do have to go now", next: acceptIndex},
-      {label:"...fine, ONE more", next: giveInIndex}
-    ]};
-    return steps;
-  }
-
-  var MECHANIC_ASSEMBLERS = {
-    chill: assembleChill,
-    sentimental: assembleSentimental,
-    oblivious: assembleOblivious,
-    chatty: assembleChatty,
-    clingy: assembleClingy
-  };
-
+  // every conversation is exactly four lines: you open, they react in their
+  // own voice, you close, and their goodbye tells you who's next.
   function buildScript(guest, nextName, t){
     var ch = characterFor(guest.name);
     var L = ch.lines[TIER_KEYS[t]] || ch.lines.fresh;
     var nextGender = nextName ? characterFor(nextName).gender : null;
-    var assemble = MECHANIC_ASSEMBLERS[ch.mechanic] || assembleChill;
-    return assemble(guest, ch, L, nextName, nextGender, t);
+    var steps = [
+      {type:'line', who:'you', text: sub(OPENER[t], guest, nextName, nextGender)},
+      {type:'line', who:guest.name, text: L.reaction},
+      {type:'line', who:'you', text: CLOSE[t]}
+    ];
+    var closing = nextName ? sub(L.closingHint, guest, nextName, nextGender) : "Bye!";
+    steps.push({type:'line', who:guest.name, text: closing, end:true});
+    return steps;
   }
 
   function alreadySaidByeSteps(guest){
